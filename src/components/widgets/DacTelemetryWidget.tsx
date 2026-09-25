@@ -121,7 +121,7 @@ export const DacTelemetryWidget: React.FC = () => {
 
         {/* ESPECTRO DE AUDIO A TIEMPO REAL (debajo de latencia estimada) */}
         <div className="pt-2">
-          <SpectrumVisualizer height={140} showControls={true} />
+          <SpectrumVisualizer height={140} />
         </div>
       </div>
     </div>

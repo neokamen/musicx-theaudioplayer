@@ -49,6 +49,7 @@ pub struct AudioTelemetry {
     pub track_artist: Option<String>,
     pub track_album: Option<String>,
     pub filepath: Option<String>,
+    pub spectrum: Vec<f32>,
 }
 
 impl Default for AudioTelemetry {
@@ -68,6 +69,7 @@ impl Default for AudioTelemetry {
             track_artist: None,
             track_album: None,
             filepath: None,
+            spectrum: vec![0.0; 16],
         }
     }
 }

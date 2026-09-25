@@ -11,7 +11,6 @@ import {
   Repeat,
   Repeat1,
   Cpu,
-  Settings,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -31,7 +30,7 @@ export const HiFiPlayerBar: React.FC = () => {
     shuffle,
     repeat,
     bitPerfectMode,
-    setSettingsOpen,
+    audioSettings,
     togglePlayPause,
     nextTrack,
     previousTrack,
@@ -50,7 +49,11 @@ export const HiFiPlayerBar: React.FC = () => {
   };
 
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
+    let val = parseFloat(e.target.value);
+    // Magnetic lock at 100% (1.0) when dragging near 1.0
+    if (val > 0.97 && val < 1.03) {
+      val = 1.0;
+    }
     setVolume(val);
   };
 
@@ -69,6 +72,8 @@ export const HiFiPlayerBar: React.FC = () => {
   // Driver de salida
   const isAlsaDirect = telemetry.output_device.toLowerCase().includes("hw:") || isBitPerfect;
   const driverLabel = isAlsaDirect ? "ALSA: Bit-Perfect" : telemetry.output_device.includes("Default") ? "PipeWire / Shared" : telemetry.output_device;
+
+  const maxVolumeLimit = audioSettings?.allowExtraVolumeBoost ? 1.25 : 1.0;
 
   return (
     <footer className="h-20 border-t border-audiophile-border bg-audiophile-surface px-4 flex items-center justify-between gap-4 font-sans select-none z-40 shrink-0">
@@ -172,7 +177,7 @@ export const HiFiPlayerBar: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Bloque de Telemetría Hi-Fi estilo Rack & Controles de Salida */}
+      {/* 3. Bloque de Telemetría Hi-Fi estilo Rack & Control de Volumen con Boost e Imán */}
       <div className="flex items-center justify-end gap-4 w-1/3 min-w-[300px]">
         {/* Rack Hi-Fi Digital Display */}
         <div className="bg-audiophile-base border border-audiophile-border/90 rounded-lg px-3 py-1.5 font-mono flex items-center gap-3 shadow-inner">
@@ -210,37 +215,35 @@ export const HiFiPlayerBar: React.FC = () => {
           </div>
         </div>
 
-        {/* Control de volumen & Botón de Ajustes */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setVolume(volume > 0 ? 0 : 1)}
-              className="text-audiophile-muted hover:text-white transition-colors"
-            >
-              {volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            </button>
+        {/* Control de volumen con Boost hasta 125% e imán en 100% */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setVolume(volume > 0 ? 0 : 1)}
+            className="text-audiophile-muted hover:text-white transition-colors"
+          >
+            {volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
+          <div className="flex flex-col items-center">
             <input
               type="range"
               min={0}
-              max={1.5}
+              max={maxVolumeLimit}
               step={0.01}
               value={volume}
               onChange={handleVolume}
-              className="w-16 h-1 bg-audiophile-border rounded-lg appearance-none cursor-pointer accent-audiophile-cyan"
-              title={`Volumen: ${(volume * 100).toFixed(0)}%`}
+              className={`w-20 h-1 rounded-lg appearance-none cursor-pointer ${
+                volume > 1.0 ? "accent-amber-400 bg-amber-950" : "accent-audiophile-cyan bg-audiophile-border"
+              }`}
+              title={`Volumen: ${(volume * 100).toFixed(0)}%${volume > 1.0 ? " (Boost +25%)" : ""}`}
             />
+            {volume > 1.0 && (
+              <span className="text-[8px] font-mono text-amber-400 font-bold -mt-0.5">
+                BOOST +{( (volume - 1.0) * 100 ).toFixed(0)}%
+              </span>
+            )}
           </div>
-
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500 text-slate-300 hover:text-cyan-400 transition-all shadow-sm"
-            title="Ajustes de musicx"
-          >
-            <Settings size={16} />
-          </button>
         </div>
       </div>
     </footer>
   );
 };
-;

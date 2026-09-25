@@ -494,6 +494,33 @@ impl AudioEngineInternal {
             .clone()
             .unwrap_or_else(|| "System Default (PipeWire/ALSA)".to_string());
 
+        if is_playing {
+            let buffer_lock = self.pcm_buffer.lock().unwrap();
+            let len = buffer_lock.len();
+            if len >= 256 {
+                let sample_slice: Vec<f32> = buffer_lock.iter().take(256).copied().collect();
+                let mut spectrum_bands = vec![0.0f32; 16];
+                let band_size = 256 / 16;
+                for b in 0..16 {
+                    let start = b * band_size;
+                    let mut sum_sq = 0.0f32;
+                    for i in 0..band_size {
+                        let s = sample_slice[start + i];
+                        sum_sq += s * s;
+                    }
+                    let rms = (sum_sq / band_size as f32).sqrt();
+                    let vol = tele.volume;
+                    let scaled = (rms * 3.2 * vol).min(1.0);
+                    spectrum_bands[b] = scaled;
+                }
+                tele.spectrum = spectrum_bands;
+            } else {
+                tele.spectrum = vec![0.0; 16];
+            }
+        } else {
+            tele.spectrum = vec![0.0; 16];
+        }
+
         if let Some(ref src) = self.current_source {
             tele.sample_rate = src.sample_rate;
             tele.bit_depth = src.bit_depth;

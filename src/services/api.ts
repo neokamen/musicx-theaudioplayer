@@ -25,6 +25,7 @@ export function normalizeTelemetry(payload: BackendTelemetryPayload): AudioTelem
     track_artist: payload.track_artist,
     track_album: payload.track_album,
     filepath: payload.filepath,
+    spectrum: payload.spectrum || [],
   };
 }
 

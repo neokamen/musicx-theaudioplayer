@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/index.ts';
 import { translations } from '../../i18n/translations.ts';
+import { SPECTRUM_STYLES, type SpectrumStyle } from '../widgets/SpectrumVisualizer.tsx';
 
 export const SettingsModal: React.FC = () => {
   const isSettingsOpen = useAppStore((s) => s.isSettingsOpen);
@@ -9,13 +10,15 @@ export const SettingsModal: React.FC = () => {
   const setLanguage = useAppStore((s) => s.setLanguage);
   const appearance = useAppStore((s) => s.appearance);
   const setAppearance = useAppStore((s) => s.setAppearance);
+  const audioSettings = useAppStore((s) => s.audioSettings);
+  const setAudioSettings = useAppStore((s) => s.setAudioSettings);
   const librarySettings = useAppStore((s) => s.librarySettings);
   const setLibrarySettings = useAppStore((s) => s.setLibrarySettings);
   const startDirectoryScan = useAppStore((s) => s.startDirectoryScan);
   const saveWindowSize = useAppStore((s) => s.saveWindowSize);
   const totalTracks = useAppStore((s) => s.libraryTracks.length);
 
-  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'library'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'audio' | 'library'>('general');
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   if (!isSettingsOpen) return null;
@@ -47,7 +50,7 @@ export const SettingsModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-fadeIn">
       <div
-        className="w-[720px] max-w-[92vw] max-h-[85vh] flex flex-col rounded-xl border border-slate-700/60 bg-slate-950/95 text-slate-100 shadow-2xl overflow-hidden"
+        className="w-[760px] max-w-[94vw] max-h-[88vh] flex flex-col rounded-xl border border-slate-700/60 bg-slate-950/95 text-slate-100 shadow-2xl overflow-hidden"
         style={{
           boxShadow: appearance.neonGlow
             ? `0 0 35px ${appearance.accentColor}33`
@@ -95,6 +98,16 @@ export const SettingsModal: React.FC = () => {
             }`}
           >
             🎨 {t.appearance}
+          </button>
+          <button
+            onClick={() => setActiveTab('audio')}
+            className={`py-3 px-4 text-sm font-medium border-b-2 transition ${
+              activeTab === 'audio'
+                ? 'border-cyan-400 text-cyan-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🎛️ {t.audio}
           </button>
           <button
             onClick={() => setActiveTab('library')}
@@ -183,8 +196,56 @@ export const SettingsModal: React.FC = () => {
           {/* APPEARANCE TAB */}
           {activeTab === 'appearance' && (
             <div className="space-y-6">
+              {/* Espectro Section */}
+              <div className="space-y-3 p-4 rounded-lg bg-slate-900/60 border border-slate-800">
+                <h4 className="text-sm font-semibold text-cyan-400 font-mono">
+                  📊 {t.spectrumVisualizer}
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-300 block mb-1">
+                      {t.spectrumStyle}
+                    </label>
+                    <select
+                      value={appearance.spectrumStyle || 'bars'}
+                      onChange={(e) =>
+                        setAppearance({
+                          spectrumStyle: e.target.value as SpectrumStyle,
+                        })
+                      }
+                      className="w-full bg-slate-950 text-cyan-300 border border-slate-700 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-500"
+                    >
+                      {SPECTRUM_STYLES.map((st) => (
+                        <option key={st.id} value={st.id}>
+                          {st.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-300 block mb-1">
+                      {t.spectrumFps}
+                    </label>
+                    <select
+                      value={appearance.spectrumFps || 60}
+                      onChange={(e) =>
+                        setAppearance({
+                          spectrumFps: Number(e.target.value) as 30 | 60 | 120,
+                        })
+                      }
+                      className="w-full bg-slate-950 text-cyan-300 border border-slate-700 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-500 font-mono"
+                    >
+                      <option value={30}>30 FPS (Bajo consumo)</option>
+                      <option value={60}>60 FPS (Ultra fluido)</option>
+                      <option value={120}>120 FPS (Máxima tasa)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Accent Color */}
-              <div className="space-y-3">
+              <div className="space-y-3 pt-2">
                 <label className="text-sm font-semibold text-slate-300 block">
                   {t.accentColor}
                 </label>
@@ -409,6 +470,108 @@ export const SettingsModal: React.FC = () => {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* AUDIO TAB */}
+          {activeTab === 'audio' && (
+            <div className="space-y-6">
+              {/* Extra Volume Gain Boost */}
+              <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-200">
+                    🔊 {t.extraVolumeGain}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={audioSettings.allowExtraVolumeBoost}
+                    onChange={(e) =>
+                      setAudioSettings({
+                        allowExtraVolumeBoost: e.target.checked,
+                      })
+                    }
+                    className="accent-cyan-500 w-4 h-4 cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-slate-400">
+                  {t.extraVolumeGainDesc}
+                </p>
+              </div>
+
+              {/* Resampling & Buffer Settings */}
+              <div className="space-y-4 pt-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    {t.resamplingQuality}
+                  </label>
+                  <select
+                    value={audioSettings.resamplingQuality}
+                    onChange={(e) =>
+                      setAudioSettings({
+                        resamplingQuality: e.target.value as any,
+                      })
+                    }
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="bit_perfect">
+                      ALSA Bit-Perfect (Direct Exclusive Raw PCM - Recomendado)
+                    </option>
+                    <option value="symphonia_96k">
+                      Symphonia High-Precision Resampler (96kHz / 24-bit)
+                    </option>
+                    <option value="float32">
+                      Audiophile IEEE-Float 32-bit Internal Engine
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    {t.bufferLatency}
+                  </label>
+                  <select
+                    value={audioSettings.bufferLatency}
+                    onChange={(e) =>
+                      setAudioSettings({
+                        bufferLatency: e.target.value as any,
+                      })
+                    }
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="ultra_low">
+                      Ultra-Low Latency (5ms / 256 muestras - Direct Hardware)
+                    </option>
+                    <option value="low">
+                      Low Latency (10ms / 512 muestras - Balanceado)
+                    </option>
+                    <option value="stable">
+                      Alta Estabilidad (40ms / 2048 muestras - Carga Reducida)
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    {t.ditherEngine}
+                  </label>
+                  <select
+                    value={audioSettings.ditherEngine}
+                    onChange={(e) =>
+                      setAudioSettings({
+                        ditherEngine: e.target.value as any,
+                      })
+                    }
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="tpdf">
+                      Triangular Dither TPDF (Reducción de ruido de cuantización)
+                    </option>
+                    <option value="none">
+                      Desactivado (Passthrough 24/32-bit directo)
+                    </option>
+                  </select>
                 </div>
               </div>
             </div>

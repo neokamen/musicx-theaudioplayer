@@ -30,6 +30,14 @@ export interface AppearanceState {
   spectrumStyle: SpectrumStyle;
 }
 
+export interface AudioSettingsState {
+  allowExtraVolumeBoost: boolean;
+  resamplingQuality: "bit_perfect" | "symphonia_96k" | "float32";
+  bufferLatency: "ultra_low" | "low" | "stable";
+  crossfadeMs: number;
+  ditherEngine: "tpdf" | "none";
+}
+
 export interface LibrarySettings {
   musicFolder: string;
   autoScanOnStartup: boolean;
@@ -58,12 +66,14 @@ export interface MusicPlayerStore {
   // Settings & Customizations
   language: Language;
   appearance: AppearanceState;
+  audioSettings: AudioSettingsState;
   librarySettings: LibrarySettings;
   isSettingsOpen: boolean;
   currentCoverArt: string | null;
   coverArtCache: Record<string, string>;
 
   // Actions
+  setAudioSettings: (settings: Partial<AudioSettingsState>) => void;
   play: (track?: Track) => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
@@ -125,6 +135,14 @@ const defaultAppearance: AppearanceState = {
   spectrumStyle: "bars",
 };
 
+const defaultAudioSettings: AudioSettingsState = {
+  allowExtraVolumeBoost: true,
+  resamplingQuality: "bit_perfect",
+  bufferLatency: "ultra_low",
+  crossfadeMs: 0,
+  ditherEngine: "tpdf",
+};
+
 const defaultLibrarySettings: LibrarySettings = {
   musicFolder: "/home",
   autoScanOnStartup: true,
@@ -133,6 +151,7 @@ const defaultLibrarySettings: LibrarySettings = {
 function loadStoredSettings(): {
   language: Language;
   appearance: AppearanceState;
+  audioSettings: AudioSettingsState;
   librarySettings: LibrarySettings;
 } {
   try {
@@ -142,6 +161,7 @@ function loadStoredSettings(): {
       return {
         language: parsed.language || "es",
         appearance: { ...defaultAppearance, ...(parsed.appearance || {}) },
+        audioSettings: { ...defaultAudioSettings, ...(parsed.audioSettings || {}) },
         librarySettings: { ...defaultLibrarySettings, ...(parsed.librarySettings || {}) },
       };
     }
@@ -151,6 +171,7 @@ function loadStoredSettings(): {
   return {
     language: "es",
     appearance: defaultAppearance,
+    audioSettings: defaultAudioSettings,
     librarySettings: defaultLibrarySettings,
   };
 }
@@ -158,6 +179,7 @@ function loadStoredSettings(): {
 function saveStoredSettings(state: {
   language: Language;
   appearance: AppearanceState;
+  audioSettings: AudioSettingsState;
   librarySettings: LibrarySettings;
 }) {
   try {
@@ -184,6 +206,7 @@ const initialTelemetry: AudioTelemetry = {
   track_artist: null,
   track_album: null,
   filepath: null,
+  spectrum: [],
 };
 
 const defaultHomePath = stored.librarySettings.musicFolder || "/home";
@@ -221,6 +244,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
 
   language: stored.language,
   appearance: stored.appearance,
+  audioSettings: stored.audioSettings,
   librarySettings: stored.librarySettings,
   isSettingsOpen: false,
   currentCoverArt: null,
@@ -480,11 +504,25 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     }
   },
 
+  setAudioSettings: (patch: Partial<AudioSettingsState>) => {
+    set((state) => {
+      const next = { ...state.audioSettings, ...patch };
+      saveStoredSettings({
+        language: state.language,
+        appearance: state.appearance,
+        audioSettings: next,
+        librarySettings: state.librarySettings,
+      });
+      return { audioSettings: next };
+    });
+  },
+
   setLanguage: (lang: Language) => {
     set({ language: lang });
     saveStoredSettings({
       language: lang,
       appearance: get().appearance,
+      audioSettings: get().audioSettings,
       librarySettings: get().librarySettings,
     });
   },
@@ -495,6 +533,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
       saveStoredSettings({
         language: state.language,
         appearance: next,
+        audioSettings: state.audioSettings,
         librarySettings: state.librarySettings,
       });
       return { appearance: next };
@@ -507,6 +546,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
       saveStoredSettings({
         language: state.language,
         appearance: state.appearance,
+        audioSettings: state.audioSettings,
         librarySettings: next,
       });
       return { librarySettings: next };
@@ -544,6 +584,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     saveStoredSettings({
       language: get().language,
       appearance: get().appearance,
+      audioSettings: get().audioSettings,
       librarySettings: get().librarySettings,
     });
   },

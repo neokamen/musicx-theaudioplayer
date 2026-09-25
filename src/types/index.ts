@@ -43,6 +43,7 @@ export interface AudioTelemetry {
   track_artist: string | null;
   track_album: string | null;
   filepath: string | null;
+  spectrum: number[];
 }
 
 export interface BackendTelemetryPayload {
@@ -60,6 +61,7 @@ export interface BackendTelemetryPayload {
   track_artist: string | null;
   track_album: string | null;
   filepath: string | null;
+  spectrum?: number[];
 }
 
 export interface ScanStatus {

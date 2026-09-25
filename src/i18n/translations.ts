@@ -4,6 +4,7 @@ export interface TranslationDictionary {
   settings: string;
   general: string;
   appearance: string;
+  audio: string;
   library: string;
   language: string;
   saveWindowSize: string;
@@ -22,6 +23,12 @@ export interface TranslationDictionary {
   spectrumVisualizer: string;
   spectrumStyle: string;
   spectrumFps: string;
+  extraVolumeGain: string;
+  extraVolumeGainDesc: string;
+  resamplingQuality: string;
+  bufferLatency: string;
+  gaplessCrossfade: string;
+  ditherEngine: string;
   musicFolder: string;
   browseFolder: string;
   autoScanStartup: string;
@@ -49,6 +56,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     settings: 'Ajustes',
     general: 'Generales',
     appearance: 'Apariencia',
+    audio: 'Audio',
     library: 'Biblioteca',
     language: 'Idioma del sistema',
     saveWindowSize: 'Guardar tamaño de ventana',
@@ -65,8 +73,14 @@ export const translations: Record<Language, TranslationDictionary> = {
     borderRadius: 'Radio de curvatura de bordes',
     borderGlow: 'Resplandor en bordes pasados por cursor',
     spectrumVisualizer: 'Espectro de audio a tiempo real',
-    spectrumStyle: 'Estilo del espectro',
-    spectrumFps: 'Fotogramas por segundo (FPS)',
+    spectrumStyle: 'Estilo del espectro visual',
+    spectrumFps: 'Rendimiento (FPS)',
+    extraVolumeGain: 'Ganancia extra de volumen (+25% Boost)',
+    extraVolumeGainDesc: 'Permite subir el deslizador de volumen de 100% hasta 125% con imán a 100%.',
+    resamplingQuality: 'Calidad de remuestreo (Resampling)',
+    bufferLatency: 'Latencia y tamaño de buffer PCM',
+    gaplessCrossfade: 'Fundido cruzado / Gapless',
+    ditherEngine: 'Motor de Dithering',
     musicFolder: 'Carpeta principal de la biblioteca',
     browseFolder: 'Examinar carpeta',
     autoScanStartup: 'Escanear automáticamente al iniciar',
@@ -92,6 +106,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     settings: 'Ajustos',
     general: 'Generals',
     appearance: 'Apariència',
+    audio: 'Àudio',
     library: 'Biblioteca',
     language: 'Idioma del sistema',
     saveWindowSize: 'Desar la mida de la finestra',
@@ -108,8 +123,14 @@ export const translations: Record<Language, TranslationDictionary> = {
     borderRadius: 'Radi de curvatura de les vores',
     borderGlow: 'Resplendor en vores al passar el cursor',
     spectrumVisualizer: 'Espectre d\'àudio en temps real',
-    spectrumStyle: 'Estil de l\'espectre',
-    spectrumFps: 'Fotogrames per segon (FPS)',
+    spectrumStyle: 'Estil de l\'espectre visual',
+    spectrumFps: 'Rendiment (FPS)',
+    extraVolumeGain: 'Guany d\'àudio addicional (+25% Boost)',
+    extraVolumeGainDesc: 'Permet pujar el control de volum del 100% al 125% amb imant al 100%.',
+    resamplingQuality: 'Qualitat de mostratge (Resampling)',
+    bufferLatency: 'Latència i mida de buffer PCM',
+    gaplessCrossfade: 'Transició suau / Gapless',
+    ditherEngine: 'Motor de Dithering',
     musicFolder: 'Carpeta principal de la biblioteca',
     browseFolder: 'Explorar carpeta',
     autoScanStartup: 'Escanejar automàticament en iniciar',
@@ -135,6 +156,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     settings: 'Settings',
     general: 'General',
     appearance: 'Appearance',
+    audio: 'Audio',
     library: 'Library',
     language: 'System Language',
     saveWindowSize: 'Save window size',
@@ -151,8 +173,14 @@ export const translations: Record<Language, TranslationDictionary> = {
     borderRadius: 'Border Corner Radius',
     borderGlow: 'Border Hover Glow',
     spectrumVisualizer: 'Real-time Audio Spectrum',
-    spectrumStyle: 'Spectrum Style',
-    spectrumFps: 'Frames Per Second (FPS)',
+    spectrumStyle: 'Spectrum Visual Style',
+    spectrumFps: 'Performance (FPS)',
+    extraVolumeGain: 'Extra Volume Gain Boost (+25% Gain)',
+    extraVolumeGainDesc: 'Allows dragging volume slider from 100% to 125% with magnetic snap at 100%.',
+    resamplingQuality: 'Resampling Quality',
+    bufferLatency: 'Buffer Latency & PCM Target',
+    gaplessCrossfade: 'Gapless / Crossfade Transition',
+    ditherEngine: 'Dithering Engine',
     musicFolder: 'Main Music Collection Folder',
     browseFolder: 'Browse Folder',
     autoScanStartup: 'Automatically scan on startup',

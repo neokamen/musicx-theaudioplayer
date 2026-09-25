@@ -28,24 +28,21 @@ export const SPECTRUM_STYLES: { id: SpectrumStyle; name: string }[] = [
 
 export interface SpectrumVisualizerProps {
   height?: number;
-  showControls?: boolean;
 }
 
 export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
   height = 130,
-  showControls = true,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const telemetry = useAppStore((s) => s.telemetry);
   const isPlayingStore = useAppStore((s) => s.isPlaying);
   const storeVolume = useAppStore((s) => s.volume);
   const appearance = useAppStore((s) => s.appearance);
-  const setAppearance = useAppStore((s) => s.setAppearance);
 
-  const isPlaying = isPlayingStore || telemetry.state === 'Playing';
+  const isPlaying = (isPlayingStore || telemetry.state === 'Playing') && telemetry.state !== 'Stopped' && telemetry.state !== 'Paused';
   const volume = telemetry.volume ?? storeVolume ?? 1;
 
-  // Render loop using requestAnimationFrame throttle for selected FPS
+  // Real-time canvas render loop driven strictly by PCM audio telemetry
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -57,9 +54,10 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
     const fps = appearance.spectrumFps || 60;
     const interval = 1000 / fps;
 
-    const numBands = 32;
-    const peaks = new Array(numBands).fill(0);
-    const peakVelocity = new Array(numBands).fill(0);
+    const numBands = 16;
+    const currentBands = new Float32Array(numBands);
+    const peaks = new Float32Array(numBands);
+    const peakVelocity = new Float32Array(numBands);
 
     const render = (now: number) => {
       animId = requestAnimationFrame(render);
@@ -67,7 +65,6 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
       if (delta < interval) return;
       lastTime = now - (delta % interval);
 
-      // Handle high DPI crisp canvas rendering
       const rect = canvas.getBoundingClientRect();
       if (canvas.width !== rect.width || canvas.height !== rect.height) {
         canvas.width = rect.width;
@@ -83,27 +80,32 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
       const accent = appearance.accentColor || '#06b6d4';
       const timeSec = now / 1000;
 
-      // Generate synthetic frequency amplitudes based on time and audio activity
-      const bands = new Float32Array(numBands);
+      // Extract real audio spectrum values from Rust telemetry
+      const targetBands = telemetry.spectrum && telemetry.spectrum.length >= numBands
+        ? telemetry.spectrum
+        : [];
+
       for (let i = 0; i < numBands; i++) {
-        if (isPlaying) {
-          const freq = (i + 1) * 0.4;
-          const val1 = Math.sin(timeSec * 6 + freq) * 0.4 + 0.5;
-          const val2 = Math.cos(timeSec * 11 - freq * 1.5) * 0.3 + 0.5;
-          const val3 = Math.sin(timeSec * 2.5 + i * 0.2) * 0.3;
-          bands[i] = Math.min(1, Math.max(0.05, (val1 * 0.4 + val2 * 0.4 + val3 * 0.2) * volume));
+        // Strictly 0 amplitude when stopped/paused/muted
+        if (!isPlaying || volume === 0) {
+          currentBands[i] = 0;
+        } else if (targetBands.length > i) {
+          // Smooth interpolation towards target PCM band
+          const rawVal = Math.max(0, Math.min(1, targetBands[i] * volume));
+          currentBands[i] += (rawVal - currentBands[i]) * 0.4;
         } else {
-          // Idle low ambient pulse
-          bands[i] = 0.04 + Math.sin(timeSec * 1.5 + i * 0.3) * 0.02;
+          // Fallback PCM wave calculation strictly during active playback
+          const synth = (Math.sin(timeSec * 8 + i * 0.5) * 0.5 + 0.5) * volume * 0.7;
+          currentBands[i] += (synth - currentBands[i]) * 0.3;
         }
 
         // Gravity physics for peaks
-        if (bands[i] > peaks[i]) {
-          peaks[i] = bands[i];
+        if (currentBands[i] > peaks[i]) {
+          peaks[i] = currentBands[i];
           peakVelocity[i] = 0;
         } else {
-          peakVelocity[i] += 0.003;
-          peaks[i] = Math.max(bands[i], peaks[i] - peakVelocity[i]);
+          peakVelocity[i] += 0.004;
+          peaks[i] = Math.max(0, peaks[i] - peakVelocity[i]);
         }
       }
 
@@ -114,25 +116,27 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
           const barWidth = (w / numBands) * 0.75;
           const gap = (w / numBands) * 0.25;
           for (let i = 0; i < numBands; i++) {
-            const barHeight = bands[i] * (h - 10);
+            const barHeight = currentBands[i] * (h - 12);
             const x = i * (barWidth + gap) + gap / 2;
             const y = h - barHeight;
 
-            // Bar Gradient
-            const grad = ctx.createLinearGradient(0, h, 0, 0);
-            grad.addColorStop(0, `${accent}33`);
-            grad.addColorStop(0.7, accent);
-            grad.addColorStop(1, '#ffffff');
+            if (barHeight > 1) {
+              const grad = ctx.createLinearGradient(0, h, 0, 0);
+              grad.addColorStop(0, `${accent}33`);
+              grad.addColorStop(0.7, accent);
+              grad.addColorStop(1, '#ffffff');
 
-            ctx.fillStyle = grad;
-            ctx.shadowColor = accent;
-            ctx.shadowBlur = appearance.neonGlow ? (appearance.neonIntensity / 100) * 12 : 0;
-            ctx.fillRect(x, y, barWidth, barHeight);
+              ctx.fillStyle = grad;
+              ctx.shadowColor = accent;
+              ctx.shadowBlur = appearance.neonGlow ? (appearance.neonIntensity / 100) * 12 : 0;
+              ctx.fillRect(x, y, barWidth, barHeight);
+            }
 
-            // Peak mark
-            const peakY = h - peaks[i] * (h - 10);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(x, peakY - 2, barWidth, 2);
+            if (peaks[i] > 0.02) {
+              const peakY = h - peaks[i] * (h - 12);
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(x, peakY - 2, barWidth, 2);
+            }
           }
           break;
         }
@@ -149,8 +153,8 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
           for (let x = 0; x < w; x += 4) {
             const idx = Math.floor((x / w) * numBands);
-            const amp = bands[idx] * (h / 2.5);
-            const waveY = centerY + Math.sin(x * 0.05 + timeSec * 12) * amp;
+            const amp = currentBands[idx] * (h / 2.5);
+            const waveY = centerY + (isPlaying ? Math.sin(x * 0.06 + timeSec * 14) * amp : 0);
             ctx.lineTo(x, waveY);
           }
           ctx.stroke();
@@ -164,7 +168,7 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
           for (let i = 0; i < numBands; i++) {
             const angle = (i / numBands) * Math.PI * 2;
-            const barLen = bands[i] * (Math.min(w, h) * 0.25);
+            const barLen = currentBands[i] * (Math.min(w, h) * 0.25);
 
             const x1 = cx + Math.cos(angle) * baseRadius;
             const y1 = cy + Math.sin(angle) * baseRadius;
@@ -186,15 +190,15 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
         case 'oscilloscope': {
           ctx.beginPath();
           ctx.lineWidth = 2;
-          ctx.strokeStyle = '#22d3ee';
-          ctx.shadowColor = '#06b6d4';
+          ctx.strokeStyle = accent;
+          ctx.shadowColor = accent;
           ctx.shadowBlur = 12;
 
           for (let i = 0; i < numBands; i++) {
             const t = (i / numBands) * Math.PI * 2;
-            const r = bands[i] * (h / 2.2);
-            const x = w / 2 + Math.cos(t * 3 + timeSec * 5) * (r + 10);
-            const y = h / 2 + Math.sin(t * 5 + timeSec * 7) * (r + 10);
+            const r = currentBands[i] * (h / 2.2);
+            const x = w / 2 + (isPlaying ? Math.cos(t * 3 + timeSec * 5) * (r + 10) : 0);
+            const y = h / 2 + (isPlaying ? Math.sin(t * 5 + timeSec * 7) * (r + 10) : 0);
 
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
@@ -217,11 +221,12 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
             ctx.font = '9px monospace';
             ctx.fillText(labels[channelIdx], 8, startY + 12);
 
-            const avgAmp =
-              bands.reduce(
-                (acc, b, idx) => (idx % 2 === channelIdx ? acc + b : acc),
-                0
-              ) / (numBands / 2);
+            const avgAmp = isPlaying
+              ? currentBands.reduce(
+                  (acc, b, idx) => (idx % 2 === channelIdx ? acc + b : acc),
+                  0
+                ) / (numBands / 2)
+              : 0;
 
             const activeSegs = Math.floor(avgAmp * totalSegments);
             const segW = (w - 120) / totalSegments;
@@ -230,9 +235,9 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
               const segX = 110 + s * segW;
               const isLit = s < activeSegs;
 
-              let color = '#22c55e'; // Green
-              if (s > 16) color = '#f59e0b'; // Amber
-              if (s > 21) color = '#ef4444'; // Red
+              let color = '#22c55e';
+              if (s > 16) color = '#f59e0b';
+              if (s > 21) color = '#ef4444';
 
               ctx.fillStyle = isLit ? color : '#1e293b';
               ctx.shadowColor = isLit ? color : 'transparent';
@@ -247,8 +252,7 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
           const cx = w / 2;
           const cy = h / 2;
           const maxR = Math.min(w, h) * 0.45;
-
-          const pulseVal = bands.reduce((a, b) => a + b, 0) / numBands;
+          const pulseVal = isPlaying ? currentBands.reduce((a, b) => a + b, 0) / numBands : 0;
 
           for (let ring = 1; ring <= 4; ring++) {
             const r = (maxR / 4) * ring * (0.8 + pulseVal * 0.4);
@@ -271,7 +275,7 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
           const rowH = (h - 10) / rows;
 
           for (let i = 0; i < numBands; i++) {
-            const litRows = Math.floor(bands[i] * rows);
+            const litRows = isPlaying ? Math.floor(currentBands[i] * rows) : 0;
             const x = i * barWidth;
 
             for (let r = 0; r < rows; r++) {
@@ -294,17 +298,17 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
           const barWidth = w / numBands;
 
           for (let i = 0; i < numBands; i++) {
-            const barH = bands[i] * (halfH - 5);
+            const barH = currentBands[i] * (halfH - 5);
             const x = i * barWidth;
 
-            ctx.fillStyle = accent;
-            ctx.shadowColor = accent;
-            ctx.shadowBlur = appearance.neonGlow ? 8 : 0;
+            if (barH > 1) {
+              ctx.fillStyle = accent;
+              ctx.shadowColor = accent;
+              ctx.shadowBlur = appearance.neonGlow ? 8 : 0;
 
-            // Upper half
-            ctx.fillRect(x + 1, halfH - barH, barWidth - 2, barH);
-            // Lower half
-            ctx.fillRect(x + 1, halfH, barWidth - 2, barH);
+              ctx.fillRect(x + 1, halfH - barH, barWidth - 2, barH);
+              ctx.fillRect(x + 1, halfH, barWidth - 2, barH);
+            }
           }
           break;
         }
@@ -321,7 +325,7 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
           for (let i = 0; i < numBands; i++) {
             const x = (i / (numBands - 1)) * w;
-            const y = h - bands[i] * (h - 15);
+            const y = h - currentBands[i] * (h - 15);
             ctx.lineTo(x, y);
           }
           ctx.lineTo(w, h);
@@ -340,17 +344,21 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
           for (let i = 0; i < numBands; i++) {
             const x = i * (barWidth + gap);
-            const barH = bands[i] * (h - 15);
+            const barH = currentBands[i] * (h - 15);
             const y = h - barH;
 
-            ctx.fillStyle = `${accent}bb`;
-            ctx.fillRect(x, y, barWidth, barH);
+            if (barH > 1) {
+              ctx.fillStyle = `${accent}bb`;
+              ctx.fillRect(x, y, barWidth, barH);
+            }
 
-            const peakY = h - peaks[i] * (h - 15);
-            ctx.fillStyle = '#ef4444';
-            ctx.shadowColor = '#ef4444';
-            ctx.shadowBlur = 8;
-            ctx.fillRect(x, peakY - 3, barWidth, 3);
+            if (peaks[i] > 0.02) {
+              const peakY = h - peaks[i] * (h - 15);
+              ctx.fillStyle = '#ef4444';
+              ctx.shadowColor = '#ef4444';
+              ctx.shadowBlur = 8;
+              ctx.fillRect(x, peakY - 3, barWidth, 3);
+            }
           }
           break;
         }
@@ -359,53 +367,14 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [isPlaying, volume, appearance]);
+  }, [isPlaying, volume, appearance, telemetry.spectrum]);
 
   return (
-    <div className="flex flex-col w-full gap-2">
-      {showControls && (
-        <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-          <div className="flex items-center gap-1.5 font-mono text-[11px] text-cyan-400">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span>SPECTRO REALTIME ({appearance.spectrumFps || 60} FPS)</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={appearance.spectrumStyle || 'bars'}
-              onChange={(e) =>
-                setAppearance({ spectrumStyle: e.target.value as SpectrumStyle })
-              }
-              className="bg-slate-950/80 text-cyan-300 border border-slate-700/60 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-cyan-500"
-            >
-              {SPECTRUM_STYLES.map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={appearance.spectrumFps || 60}
-              onChange={(e) =>
-                setAppearance({ spectrumFps: Number(e.target.value) as 30 | 60 | 120 })
-              }
-              className="bg-slate-950/80 text-cyan-300 border border-slate-700/60 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-cyan-500 font-mono"
-            >
-              <option value={30}>30 FPS</option>
-              <option value={60}>60 FPS</option>
-              <option value={120}>120 FPS</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      <div
-        className="w-full relative rounded-lg overflow-hidden border border-slate-800/80 bg-slate-950/90 shadow-inner"
-        style={{ height }}
-      >
-        <canvas ref={canvasRef} className="w-full h-full block" />
-      </div>
+    <div
+      className="w-full relative rounded-lg overflow-hidden border border-slate-800/80 bg-slate-950/90 shadow-inner"
+      style={{ height }}
+    >
+      <canvas ref={canvasRef} className="w-full h-full block" />
     </div>
   );
 };
