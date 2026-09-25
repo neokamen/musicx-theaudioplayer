@@ -19,7 +19,7 @@ impl DatabaseManager {
         let conn = Connection::open(db_path)?;
 
         // WAL mode for high concurrency and fast write throughput
-        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update_and_check(None, "journal_mode", "WAL", |_| Ok(()))?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "temp_store", "MEMORY")?;
         conn.pragma_update(None, "cache_size", -64000)?; // 64MB cache
