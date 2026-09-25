@@ -1,0 +1,137 @@
+use crate::audio::{get_available_audio_devices, AudioCommand};
+use crate::db::{self, DatabaseManager};
+use crate::fs_lazy;
+use crate::models::{AudioTelemetry, FileEntry, TrackMetadata};
+use std::path::PathBuf;
+use std::sync::Arc;
+use tauri::{AppHandle, State};
+
+pub struct AppState {
+    pub audio: Arc<crate::audio::AudioEngineHandle>,
+    pub db: Arc<DatabaseManager>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AudioEngineStatus {
+    pub engine: String,
+    pub status: String,
+    pub sample_rate: u32,
+    pub bit_depth: u16,
+    pub channels: u16,
+    pub driver: String,
+    pub supported_codecs: Vec<String>,
+}
+
+#[tauri::command]
+pub fn get_audio_engine_status(state: State<'_, AppState>) -> AudioEngineStatus {
+    let tele = state.audio.get_telemetry();
+    let status_str = match tele.state {
+        crate::models::PlaybackState::Playing => "Playing",
+        crate::models::PlaybackState::Paused => "Paused",
+        crate::models::PlaybackState::Stopped => "Ready / Idle",
+    };
+
+    AudioEngineStatus {
+        engine: "musicx Hi-Fi Bit-Perfect Core (Rust)".to_string(),
+        status: status_str.to_string(),
+        sample_rate: if tele.sample_rate > 0 { tele.sample_rate } else { 192_000 },
+        bit_depth: if tele.bit_depth > 0 { tele.bit_depth } else { 24 },
+        channels: tele.channels,
+        driver: tele.output_device,
+        supported_codecs: vec![
+            "FLAC (Lossless 24/192)".to_string(),
+            "WAV (PCM / IEEE-Float)".to_string(),
+            "MP3".to_string(),
+            "ALAC / AAC (MP4 container)".to_string(),
+            "OGG / Vorbis".to_string(),
+        ],
+    }
+}
+
+#[tauri::command]
+pub fn get_telemetry(state: State<'_, AppState>) -> AudioTelemetry {
+    state.audio.get_telemetry()
+}
+
+#[tauri::command]
+pub fn play_track(
+    path: String,
+    bit_perfect: Option<bool>,
+    device_name: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.audio.send(AudioCommand::PlayTrack {
+        path,
+        bit_perfect: bit_perfect.unwrap_or(false),
+        device_name,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn pause_track(state: State<'_, AppState>) -> Result<(), String> {
+    state.audio.send(AudioCommand::Pause);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn resume_track(state: State<'_, AppState>) -> Result<(), String> {
+    state.audio.send(AudioCommand::Play);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_track(state: State<'_, AppState>) -> Result<(), String> {
+    state.audio.send(AudioCommand::Stop);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn seek_track(position_seconds: f64, state: State<'_, AppState>) -> Result<(), String> {
+    state.audio.send(AudioCommand::Seek(position_seconds));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_volume(volume: f32, state: State<'_, AppState>) -> Result<(), String> {
+    state.audio.send(AudioCommand::SetVolume(volume));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_output_device(
+    device_name: Option<String>,
+    bit_perfect: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.audio.send(AudioCommand::SetOutputDevice {
+        device_name,
+        bit_perfect: bit_perfect.unwrap_or(false),
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_audio_devices() -> Vec<String> {
+    get_available_audio_devices()
+}
+
+#[tauri::command]
+pub fn get_library_tracks(state: State<'_, AppState>) -> Result<Vec<TrackMetadata>, String> {
+    state.db.get_all_tracks().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn scan_directory(path: String, app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let p = PathBuf::from(path);
+    if !p.exists() || !p.is_dir() {
+        return Err("Ruta de directorio inválida".to_string());
+    }
+    db::scan_directory_incremental(p, Arc::clone(&state.db), app_handle);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn read_directory_lazy(path: String) -> Result<Vec<FileEntry>, String> {
+    fs_lazy::read_directory_lazy_internal(path)
+}
