@@ -4,6 +4,7 @@ export type WidgetType =
   | "cover"
   | "inspector"
   | "eq_bars"
+  | "spectrum"
   | "dac_telemetry"
   | "queue";
 
@@ -40,9 +41,14 @@ export const AVAILABLE_WIDGETS: WidgetMeta[] = [
     description: "Visualización de 10 bandas y controles de ganancia DSP",
   },
   {
+    type: "spectrum",
+    label: "Espectro Visualizador (Tiempo Real)",
+    description: "Visualización independiente de frecuencias FFT y vúmetros",
+  },
+  {
     type: "dac_telemetry",
     label: "Telemetría Hi-Fi & DAC",
-    description: "Estado ALSA/PipeWire, stream bit-perfect y medidor dinámico",
+    description: "Estado ALSA/PipeWire, stream bit-perfect y master clock",
   },
   {
     type: "queue",

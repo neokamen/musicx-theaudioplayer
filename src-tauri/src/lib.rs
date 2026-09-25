@@ -10,7 +10,7 @@ use commands::AppState;
 use db::DatabaseManager;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -37,9 +37,23 @@ pub fn run() {
                 let db = Arc::new(db);
 
                 app.manage(AppState {
-                    audio: audio_engine,
+                    audio: Arc::clone(&audio_engine),
                     db,
                 });
+
+                // Spawn real-time audio telemetry broadcaster thread (30ms = ~33 FPS)
+                let app_handle = app.handle().clone();
+                let audio_for_telemetry = Arc::clone(&audio_engine);
+                std::thread::Builder::new()
+                    .name("musicx-telemetry-broadcaster".to_string())
+                    .spawn(move || {
+                        loop {
+                            std::thread::sleep(std::time::Duration::from_millis(30));
+                            let tele = audio_for_telemetry.get_telemetry();
+                            let _ = app_handle.emit("audio-telemetry", &tele);
+                        }
+                    })
+                    .expect("Failed to spawn telemetry broadcaster thread");
 
                 Ok(())
             }
@@ -54,6 +68,7 @@ pub fn run() {
             commands::seek_track,
             commands::set_volume,
             commands::set_output_device,
+            commands::set_dsp_settings,
             commands::list_audio_devices,
             commands::get_library_tracks,
             commands::scan_directory,

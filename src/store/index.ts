@@ -48,6 +48,9 @@ export interface PlaybackSettingsState {
   gaplessPlayback: boolean;
   replayGainMode: "track" | "album" | "off";
   autoPlayOnDrop: boolean;
+  playerBarStyle: "classic" | "spectrum" | "hybrid";
+  diffuseAlbumArt: boolean;
+  diffuseAlbumArtOpacity: number;
 }
 
 export interface ListeningStatsState {
@@ -97,6 +100,7 @@ export interface MusicPlayerStore {
   setAudioSettings: (settings: Partial<AudioSettingsState>) => void;
   setPlaybackSettings: (settings: Partial<PlaybackSettingsState>) => void;
   resetStats: () => void;
+  setListeningStats: (stats: Partial<ListeningStatsState>) => void;
   resetSettings: () => void;
   clearCacheAndResidues: () => void;
   play: (track?: Track) => Promise<void>;
@@ -178,6 +182,9 @@ const defaultPlaybackSettings: PlaybackSettingsState = {
   gaplessPlayback: true,
   replayGainMode: "track",
   autoPlayOnDrop: true,
+  playerBarStyle: "hybrid",
+  diffuseAlbumArt: true,
+  diffuseAlbumArtOpacity: 25,
 };
 
 const defaultListeningStats: ListeningStatsState = {
@@ -645,6 +652,21 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         librarySettings: state.librarySettings,
       });
       return { listeningStats: freshStats };
+    });
+  },
+
+  setListeningStats: (patch: Partial<ListeningStatsState>) => {
+    set((state) => {
+      const next = { ...state.listeningStats, ...patch };
+      saveStoredSettings({
+        language: state.language,
+        appearance: state.appearance,
+        audioSettings: state.audioSettings,
+        playbackSettings: state.playbackSettings,
+        listeningStats: next,
+        librarySettings: state.librarySettings,
+      });
+      return { listeningStats: next };
     });
   },
 

@@ -18,6 +18,27 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::units::Time;
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DspSettings {
+    pub is_eq_enabled: bool,
+    pub eq_gains: Vec<f32>,
+    pub is_normalizer_enabled: bool,
+    pub is_xdss_enabled: bool,
+    pub tube_warmth: bool,
+}
+
+impl Default for DspSettings {
+    fn default() -> Self {
+        Self {
+            is_eq_enabled: false,
+            eq_gains: vec![0.0; 10],
+            is_normalizer_enabled: true,
+            is_xdss_enabled: false,
+            tube_warmth: false,
+        }
+    }
+}
+
 pub enum AudioCommand {
     PlayTrack { path: String, bit_perfect: bool, device_name: Option<String> },
     EnqueueTrack { path: String },
@@ -27,6 +48,7 @@ pub enum AudioCommand {
     Seek(f64),
     SetVolume(f32),
     SetOutputDevice { device_name: Option<String>, bit_perfect: bool },
+    SetDspSettings(DspSettings),
 }
 
 pub struct AudioEngineHandle {
@@ -155,6 +177,7 @@ struct AudioEngineInternal {
     active_channels: u16,
     samples_rendered: Arc<AtomicU32>,
     current_pos_secs: f64,
+    dsp_settings: Arc<Mutex<DspSettings>>,
 }
 
 impl AudioEngineInternal {
@@ -174,6 +197,7 @@ impl AudioEngineInternal {
             active_channels: 2,
             samples_rendered: Arc::new(AtomicU32::new(0)),
             current_pos_secs: 0.0,
+            dsp_settings: Arc::new(Mutex::new(DspSettings::default())),
         }
     }
 
@@ -244,6 +268,9 @@ impl AudioEngineInternal {
                 if self.is_playing.load(Ordering::Relaxed) {
                     self.setup_cpal_stream();
                 }
+            }
+            AudioCommand::SetDspSettings(settings) => {
+                *self.dsp_settings.lock().unwrap() = settings;
             }
         }
     }
@@ -429,6 +456,7 @@ impl AudioEngineInternal {
         let volume_clone = Arc::clone(&self.volume);
         let is_playing_clone = Arc::clone(&self.is_playing);
         let samples_counter = Arc::clone(&self.samples_rendered);
+        let dsp_settings_clone = Arc::clone(&self.dsp_settings);
 
         let err_fn = |err| eprintln!("[musicx cpal stream error]: {}", err);
 
@@ -437,6 +465,7 @@ impl AudioEngineInternal {
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 let playing = is_playing_clone.load(Ordering::Relaxed);
                 let vol = *volume_clone.lock().unwrap();
+                let dsp = dsp_settings_clone.lock().unwrap().clone();
 
                 if !playing {
                     for sample in data.iter_mut() {
@@ -450,7 +479,29 @@ impl AudioEngineInternal {
 
                 for sample in data.iter_mut() {
                     if let Some(val) = buf.pop_front() {
-                        *sample = val * vol;
+                        let mut s = val * vol;
+
+                        // 1. XDSS Dynamic Bass Harmonic Enhancement
+                        if dsp.is_xdss_enabled {
+                            let bass_drive = (s * 1.8).tanh() * 0.28;
+                            s += bass_drive;
+                        }
+
+                        // 2. Tube Warmth
+                        if dsp.tube_warmth {
+                            s = s * 1.05 - 0.05 * s * s * s;
+                        }
+
+                        // 3. Soundix True-Peak Normalizer & Soft Limiter (-0.1 dBTP)
+                        if dsp.is_normalizer_enabled {
+                            if s > 0.988 {
+                                s = 0.988 + (s - 0.988).tanh() * 0.01;
+                            } else if s < -0.988 {
+                                s = -0.988 + (s + 0.988).tanh() * 0.01;
+                            }
+                        }
+
+                        *sample = s;
                         rendered += 1;
                     } else {
                         *sample = 0.0;

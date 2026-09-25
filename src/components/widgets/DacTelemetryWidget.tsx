@@ -1,13 +1,13 @@
 import React from "react";
 import { useMusicStore } from "../../store/index.ts";
-import { Activity, ShieldCheck } from "lucide-react";
-import { SpectrumVisualizer } from "./SpectrumVisualizer.tsx";
+import { Activity, ShieldCheck, Cpu, Volume2 } from "lucide-react";
 
 export const DacTelemetryWidget: React.FC = () => {
   const {
     telemetry,
     currentTrack,
     bitPerfectMode,
+    selectedDevice,
     appearance,
     setBitPerfectMode,
   } = useMusicStore();
@@ -20,6 +20,7 @@ export const DacTelemetryWidget: React.FC = () => {
     ? `${telemetry.bits_per_sample}-bit`
     : "16-bit";
   const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 1411;
+  const channels = telemetry.channels === 1 ? "1.0 Mono" : telemetry.channels === 2 ? "2.0 Stereo" : `${telemetry.channels || 2} ch`;
 
   return (
     <div className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans overflow-hidden text-xs">
@@ -87,11 +88,35 @@ export const DacTelemetryWidget: React.FC = () => {
           <span>{isBitPerfect ? "ALSA BIT-PERFECT: ACTIVADO" : "MODO COMPARTIDO (PIPEWIRE)"}</span>
         </button>
 
-        {/* Espectro a tiempo real debajo de latencia */}
-        <div className="flex-1 min-h-[100px] rounded-lg bg-slate-950 border border-slate-800/80 p-1 flex flex-col justify-end overflow-hidden">
-          <SpectrumVisualizer height={105} />
+        {/* Detalles de DAC Hardware & Stream */}
+        <div className="space-y-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[10px] text-slate-300">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 flex items-center gap-1">
+              <Cpu size={11} style={{ color: appearance.accentColor }} />
+              Dispositivo Hardware:
+            </span>
+            <span className="font-bold text-slate-200 truncate max-w-[150px]" title={telemetry.output_device || selectedDevice}>
+              {telemetry.output_device || selectedDevice}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 flex items-center gap-1">
+              <Volume2 size={11} className="text-emerald-400" />
+              Canales / Config:
+            </span>
+            <span className="text-slate-200 font-bold">{channels}</span>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-slate-900 pt-1.5">
+            <span className="text-slate-400">Modo de Flujo:</span>
+            <span className="font-mono text-cyan-300 font-bold">
+              {isBitPerfect ? "Exclusive Raw PCM (Direct)" : "Shared Audio Server"}
+            </span>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

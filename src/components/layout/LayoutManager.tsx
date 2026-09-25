@@ -138,10 +138,10 @@ export const LayoutManager: React.FC = () => {
       <div className="h-8 px-4 border-b border-audiophile-border bg-audiophile-surface flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10px] text-audiophile-muted uppercase tracking-wider">
-            Arquitectura de Paneles:
+            Arquitectura:
           </span>
           <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-audiophile-surface2 border border-audiophile-border text-audiophile-cyan">
-            Fooyin / Foobar Modular
+            Ventanas Modular
           </span>
         </div>
 

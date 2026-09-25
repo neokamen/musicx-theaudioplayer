@@ -291,7 +291,7 @@ export const FolderExplorer: React.FC = () => {
                         <Music size={14} style={{ color: appearance.accentColor }} className="shrink-0" />
                       )}
                       <span
-                        className="truncate text-slate-300 group-hover:text-white transition-all group-hover:animate-marquee"
+                        className="truncate text-slate-300 group-hover:text-white transition-all hover-marquee"
                         title={entry.name}
                       >
                         {entry.name}
@@ -390,7 +390,7 @@ export const FolderExplorer: React.FC = () => {
                         ) : (
                           <Music size={14} style={{ color: appearance.accentColor }} className="shrink-0" />
                         )}
-                        <span className="truncate text-slate-300 group-hover:text-white" title={entry.name}>
+                        <span className="truncate text-slate-300 group-hover:text-white hover-marquee" title={entry.name}>
                           {entry.name}
                         </span>
                       </td>

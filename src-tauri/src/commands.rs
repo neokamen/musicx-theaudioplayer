@@ -189,3 +189,13 @@ pub fn get_track_cover_art(path: String) -> Option<String> {
 
     None
 }
+
+#[tauri::command]
+pub fn set_dsp_settings(
+    state: State<'_, AppState>,
+    settings: crate::audio::DspSettings,
+) -> Result<(), String> {
+    state.audio.send(crate::audio::AudioCommand::SetDspSettings(settings));
+    Ok(())
+}
+

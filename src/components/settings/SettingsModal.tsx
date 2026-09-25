@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '../../store/index.ts';
 import { translations } from '../../i18n/translations.ts';
 import { SPECTRUM_STYLES, type SpectrumStyle } from '../widgets/SpectrumVisualizer.tsx';
+import { RotateCcw, Trash2, Sliders, Disc } from 'lucide-react';
 
 export const SettingsModal: React.FC = () => {
   const isSettingsOpen = useAppStore((s) => s.isSettingsOpen);
@@ -12,13 +13,25 @@ export const SettingsModal: React.FC = () => {
   const setAppearance = useAppStore((s) => s.setAppearance);
   const audioSettings = useAppStore((s) => s.audioSettings);
   const setAudioSettings = useAppStore((s) => s.setAudioSettings);
+  const playbackSettings = useAppStore((s) => s.playbackSettings);
+  const setPlaybackSettings = useAppStore((s) => s.setPlaybackSettings);
+  const listeningStats = useAppStore((s) => s.listeningStats);
+  const setListeningStats = useAppStore((s) => s.setListeningStats);
+  const resetStats = useAppStore((s) => s.resetStats);
+  const resetSettings = useAppStore((s) => s.resetSettings);
+  const clearCacheAndResidues = useAppStore((s) => s.clearCacheAndResidues);
   const librarySettings = useAppStore((s) => s.librarySettings);
   const setLibrarySettings = useAppStore((s) => s.setLibrarySettings);
   const startDirectoryScan = useAppStore((s) => s.startDirectoryScan);
   const saveWindowSize = useAppStore((s) => s.saveWindowSize);
-  const totalTracks = useAppStore((s) => s.libraryTracks.length);
+  const libraryTracks = useAppStore((s) => s.libraryTracks);
 
-  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'audio' | 'library'>('general');
+  const totalTracks = libraryTracks.length;
+  const totalLibrarySeconds = libraryTracks.reduce((acc, t) => acc + (t.duration_seconds || 0), 0);
+  const totalLibraryHours = (totalLibrarySeconds / 3600).toFixed(1);
+  const listenedHours = ((listeningStats?.totalSecondsListened || 0) / 3600).toFixed(1);
+
+  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'playback' | 'audio' | 'library' | 'about'>('general');
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   if (!isSettingsOpen) return null;
@@ -50,7 +63,7 @@ export const SettingsModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-fadeIn">
       <div
-        className="w-[760px] max-w-[94vw] max-h-[88vh] flex flex-col rounded-xl border border-slate-700/60 bg-slate-950/95 text-slate-100 shadow-2xl overflow-hidden"
+        className="w-[780px] max-w-[94vw] h-[620px] max-h-[90vh] flex flex-col rounded-xl border border-slate-700/60 bg-slate-950/95 text-slate-100 shadow-2xl overflow-hidden"
         style={{
           boxShadow: appearance.neonGlow
             ? `0 0 35px ${appearance.accentColor}33`
@@ -58,7 +71,7 @@ export const SettingsModal: React.FC = () => {
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/60">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/60 shrink-0">
           <div className="flex items-center gap-3">
             <div
               className="w-3 h-3 rounded-full"
@@ -77,13 +90,13 @@ export const SettingsModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-slate-800 px-6 gap-2 bg-slate-900/40">
+        {/* Tabs Bar */}
+        <div className="flex border-b border-slate-800 px-6 gap-2 bg-slate-900/40 shrink-0 overflow-x-auto">
           <button
             onClick={() => setActiveTab('general')}
-            className={`py-3 px-4 text-sm font-medium border-b-2 transition ${
+            className={`py-3 px-3.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
               activeTab === 'general'
-                ? 'border-cyan-400 text-cyan-400'
+                ? 'border-cyan-400 text-cyan-400 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -91,19 +104,29 @@ export const SettingsModal: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('appearance')}
-            className={`py-3 px-4 text-sm font-medium border-b-2 transition ${
+            className={`py-3 px-3.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
               activeTab === 'appearance'
-                ? 'border-cyan-400 text-cyan-400'
+                ? 'border-cyan-400 text-cyan-400 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             🎨 {t.appearance}
           </button>
           <button
+            onClick={() => setActiveTab('playback')}
+            className={`py-3 px-3.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
+              activeTab === 'playback'
+                ? 'border-cyan-400 text-cyan-400 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            ▶️ Reproducción
+          </button>
+          <button
             onClick={() => setActiveTab('audio')}
-            className={`py-3 px-4 text-sm font-medium border-b-2 transition ${
+            className={`py-3 px-3.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
               activeTab === 'audio'
-                ? 'border-cyan-400 text-cyan-400'
+                ? 'border-cyan-400 text-cyan-400 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -111,13 +134,23 @@ export const SettingsModal: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('library')}
-            className={`py-3 px-4 text-sm font-medium border-b-2 transition ${
+            className={`py-3 px-3.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
               activeTab === 'library'
-                ? 'border-cyan-400 text-cyan-400'
+                ? 'border-cyan-400 text-cyan-400 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             🎵 {t.library}
+          </button>
+          <button
+            onClick={() => setActiveTab('about')}
+            className={`py-3 px-3.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${
+              activeTab === 'about'
+                ? 'border-cyan-400 text-cyan-400 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            ℹ️ Acerca de
           </button>
         </div>
 
@@ -126,6 +159,7 @@ export const SettingsModal: React.FC = () => {
           {/* GENERAL TAB */}
           {activeTab === 'general' && (
             <div className="space-y-6">
+              {/* Idioma sin iconos de banderas */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-300 block">
                   {t.language}
@@ -133,39 +167,40 @@ export const SettingsModal: React.FC = () => {
                 <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setLanguage('es')}
-                    className={`py-3 px-4 rounded-lg border font-medium text-sm flex items-center justify-center gap-2 transition ${
+                    className={`py-2.5 px-4 rounded-lg border font-medium text-xs flex items-center justify-center transition ${
                       language === 'es'
-                        ? 'border-cyan-500 bg-cyan-950/40 text-cyan-300 shadow-md'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-cyan-300 shadow-md font-bold'
                         : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
                     }`}
                   >
-                    <span>🇪🇸</span> Castellano
+                    Castellano
                   </button>
 
                   <button
                     onClick={() => setLanguage('ca')}
-                    className={`py-3 px-4 rounded-lg border font-medium text-sm flex items-center justify-center gap-2 transition ${
+                    className={`py-2.5 px-4 rounded-lg border font-medium text-xs flex items-center justify-center transition ${
                       language === 'ca'
-                        ? 'border-cyan-500 bg-cyan-950/40 text-cyan-300 shadow-md'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-cyan-300 shadow-md font-bold'
                         : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
                     }`}
                   >
-                    <span>🚩</span> Català
+                    Català
                   </button>
 
                   <button
                     onClick={() => setLanguage('en')}
-                    className={`py-3 px-4 rounded-lg border font-medium text-sm flex items-center justify-center gap-2 transition ${
+                    className={`py-2.5 px-4 rounded-lg border font-medium text-xs flex items-center justify-center transition ${
                       language === 'en'
-                        ? 'border-cyan-500 bg-cyan-950/40 text-cyan-300 shadow-md'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-cyan-300 shadow-md font-bold'
                         : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
                     }`}
                   >
-                    <span>🇬🇧</span> English
+                    English
                   </button>
                 </div>
               </div>
 
+              {/* Guardar Tamaño de Ventana */}
               <div className="pt-4 border-t border-slate-800/80">
                 <div className="flex items-center justify-between">
                   <div>
@@ -179,7 +214,7 @@ export const SettingsModal: React.FC = () => {
 
                   <button
                     onClick={handleSaveWindow}
-                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-sm transition shadow-md"
+                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs transition shadow-md"
                   >
                     {t.saveWindowSize}
                   </button>
@@ -189,6 +224,38 @@ export const SettingsModal: React.FC = () => {
                     ✓ {savedMessage}
                   </p>
                 )}
+              </div>
+
+              {/* Botones de Mantenimiento del Sistema */}
+              <div className="pt-4 border-t border-slate-800/80 space-y-3">
+                <h4 className="text-sm font-semibold text-slate-200">
+                  Mantenimiento y Restauración
+                </h4>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      resetSettings();
+                      setSavedMessage("Ajustes restablecidos correctamente.");
+                      setTimeout(() => setSavedMessage(null), 2500);
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-amber-400 font-medium text-xs transition flex items-center gap-2"
+                  >
+                    <RotateCcw size={13} />
+                    Restablecer Ajustes Predeterminados
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      clearCacheAndResidues();
+                      setSavedMessage("Caché y archivos residuales eliminados.");
+                      setTimeout(() => setSavedMessage(null), 2500);
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 font-medium text-xs transition flex items-center gap-2"
+                  >
+                    <Trash2 size={13} />
+                    Borrar Caché y Residuos
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -475,6 +542,135 @@ export const SettingsModal: React.FC = () => {
             </div>
           )}
 
+          {/* PLAYBACK TAB */}
+          {activeTab === 'playback' && (
+            <div className="space-y-6">
+              {/* Estilo de Barra de Reproducción */}
+              <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 space-y-3">
+                <h4 className="text-sm font-semibold text-cyan-400 font-mono flex items-center gap-2">
+                  <Sliders size={14} />
+                  Estilo de Barra de Reproducción
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Elige cómo se renderiza la barra central de progreso y visualización de onda.
+                </p>
+
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  <button
+                    onClick={() => setPlaybackSettings({ playerBarStyle: 'classic' })}
+                    className={`p-3 rounded-lg border text-left transition flex flex-col gap-1 ${
+                      (playbackSettings?.playerBarStyle || 'hybrid') === 'classic'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-white'
+                        : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-cyan-300">Clásico Hi-Fi</span>
+                    <span className="text-[10px] text-slate-400">Barra de progreso fina tradicional</span>
+                  </button>
+
+                  <button
+                    onClick={() => setPlaybackSettings({ playerBarStyle: 'spectrum' })}
+                    className={`p-3 rounded-lg border text-left transition flex flex-col gap-1 ${
+                      playbackSettings?.playerBarStyle === 'spectrum'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-white'
+                        : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-cyan-300">Espectro Onda</span>
+                    <span className="text-[10px] text-slate-400">Visualizador reactivo en la barra</span>
+                  </button>
+
+                  <button
+                    onClick={() => setPlaybackSettings({ playerBarStyle: 'hybrid' })}
+                    className={`p-3 rounded-lg border text-left transition flex flex-col gap-1 ${
+                      playbackSettings?.playerBarStyle === 'hybrid'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-white'
+                        : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-cyan-300">Híbrido (Recomendado)</span>
+                    <span className="text-[10px] text-slate-400">Barra de tiempo con mini-espectro</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Difuminar carátula en la lista de canciones */}
+              <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                      <Disc size={14} className="text-cyan-400" />
+                      Difuminar Carátula en Lista de Biblioteca
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Muestra la portada del álbum en reproducción de fondo con desenfoque ambiental.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={playbackSettings?.diffuseAlbumArt ?? true}
+                    onChange={(e) =>
+                      setPlaybackSettings({ diffuseAlbumArt: e.target.checked })
+                    }
+                    className="accent-cyan-500 w-4 h-4 cursor-pointer"
+                  />
+                </div>
+
+                {playbackSettings?.diffuseAlbumArt && (
+                  <div className="pt-2 flex items-center gap-4">
+                    <span className="text-xs text-slate-400 w-32">
+                      Opacidad / Transparencia:
+                    </span>
+                    <input
+                      type="range"
+                      min="5"
+                      max="80"
+                      value={playbackSettings?.diffuseAlbumArtOpacity ?? 25}
+                      onChange={(e) =>
+                        setPlaybackSettings({ diffuseAlbumArtOpacity: Number(e.target.value) })
+                      }
+                      className="flex-1 accent-cyan-400"
+                    />
+                    <span className="text-xs font-mono text-cyan-400 w-10">
+                      {playbackSettings?.diffuseAlbumArtOpacity ?? 25}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Ajustes avanzados de reproducción gapless & drop */}
+              <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">
+                    Gapless Playback (Transición perfecta sin pausas entre pistas)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={playbackSettings?.gaplessPlayback ?? true}
+                    onChange={(e) =>
+                      setPlaybackSettings({ gaplessPlayback: e.target.checked })
+                    }
+                    className="accent-cyan-500 w-4 h-4 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
+                  <span className="text-xs font-semibold text-slate-300">
+                    Auto-reproducir inmediatamente al soltar pistas (Drag & Drop)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={playbackSettings?.autoPlayOnDrop ?? true}
+                    onChange={(e) =>
+                      setPlaybackSettings({ autoPlayOnDrop: e.target.checked })
+                    }
+                    className="accent-cyan-500 w-4 h-4 cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* AUDIO TAB */}
           {activeTab === 'audio' && (
             <div className="space-y-6">
@@ -510,7 +706,7 @@ export const SettingsModal: React.FC = () => {
                     value={audioSettings.resamplingQuality}
                     onChange={(e) =>
                       setAudioSettings({
-                        resamplingQuality: e.target.value as any,
+                        resamplingQuality: e.target.value as "bit_perfect" | "symphonia_96k" | "float32",
                       })
                     }
                     className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
@@ -535,7 +731,7 @@ export const SettingsModal: React.FC = () => {
                     value={audioSettings.bufferLatency}
                     onChange={(e) =>
                       setAudioSettings({
-                        bufferLatency: e.target.value as any,
+                        bufferLatency: e.target.value as "ultra_low" | "low" | "stable",
                       })
                     }
                     className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
@@ -560,7 +756,7 @@ export const SettingsModal: React.FC = () => {
                     value={audioSettings.ditherEngine}
                     onChange={(e) =>
                       setAudioSettings({
-                        ditherEngine: e.target.value as any,
+                        ditherEngine: e.target.value as "tpdf" | "none",
                       })
                     }
                     className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
@@ -617,11 +813,103 @@ export const SettingsModal: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-sm text-slate-300">{t.totalTracks}:</span>
-                  <span className="font-mono text-cyan-400 font-bold text-sm">
-                    {totalTracks}
-                  </span>
+                {/* Estadísticas Nerd de la Biblioteca */}
+                <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3 font-mono">
+                  <div className="text-xs uppercase text-cyan-400 font-bold tracking-wider flex items-center justify-between">
+                    <span>Telemetría Nerd de Biblioteca</span>
+                    <button
+                      onClick={resetStats}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 underline font-normal"
+                    >
+                      Reiniciar Estadísticas
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Total de Canciones</span>
+                      <span className="text-base font-bold text-white">{totalTracks}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Horas en Biblioteca</span>
+                      <span className="text-base font-bold text-emerald-400">{totalLibraryHours} h</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Horas de Música Escuchada</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={listenedHours}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setListeningStats({ totalSecondsListened: Math.round(val * 3600) });
+                          }}
+                          className="w-16 bg-slate-900 border border-slate-700 rounded px-1 text-cyan-300 font-bold text-xs"
+                        />
+                        <span className="text-slate-400 text-xs">horas</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Sesiones de Escucha</span>
+                      <span className="text-base font-bold text-amber-400">{listeningStats?.totalSessions ?? 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ABOUT TAB */}
+          {activeTab === 'about' && (
+            <div className="space-y-5 font-mono text-xs">
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-slate-950 text-sm"
+                    style={{ backgroundColor: appearance.accentColor || '#06b6d4' }}
+                  >
+                    MX
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">musicx — the audio player</h3>
+                    <p className="text-[11px] text-slate-400">Versión 2.4.0 (Hi-Fi Master Edition)</p>
+                  </div>
+                </div>
+
+                <p className="text-slate-300 leading-relaxed font-sans text-xs">
+                  Reproductor de audio audiófilo de ultra alto rendimiento diseñado con arquitectura
+                  de <strong>Ventanas Modular</strong> desacopladas, motor nativo en Rust con Symphonia y CPAL,
+                  salida directa ALSA Bit-Perfect sin remuestreo y visualizador FFT en tiempo real a 60+ FPS.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-[11px]">
+                <div className="p-3 rounded-lg bg-slate-900/40 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 uppercase text-[9px]">Motor de Sonido</span>
+                  <div className="text-slate-200 font-bold">Rust CPAL (Direct Raw ALSA)</div>
+                  <div className="text-[10px] text-slate-400">64-bit IEEE Float Audio Pipeline</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900/40 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 uppercase text-[9px]">Procesamiento DSP</span>
+                  <div className="text-slate-200 font-bold">Linear 10-Band EQ & XDSS</div>
+                  <div className="text-[10px] text-slate-400">Soundix True-Peak Normalizer (-0.1 dBTP)</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900/40 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 uppercase text-[9px]">Frontend UI</span>
+                  <div className="text-slate-200 font-bold">React 19 + Tailwind CSS</div>
+                  <div className="text-[10px] text-slate-400">Virtualizer de 60+ FPS para 50k+ pistas</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900/40 border border-slate-800 space-y-1">
+                  <span className="text-slate-500 uppercase text-[9px]">Arquitectura</span>
+                  <div className="text-slate-200 font-bold">Ventanas Modular</div>
+                  <div className="text-[10px] text-slate-400">Paneles independientes reconfigurables</div>
                 </div>
               </div>
             </div>
@@ -629,10 +917,10 @@ export const SettingsModal: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/60 flex justify-end">
+        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/60 flex justify-end shrink-0">
           <button
             onClick={() => setSettingsOpen(false)}
-            className="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-sm shadow-md transition"
+            className="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md transition"
           >
             Guardar & Cerrar
           </button>

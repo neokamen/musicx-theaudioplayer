@@ -36,6 +36,7 @@ export const HiFiPlayerBar: React.FC = () => {
     availableDevices,
     selectedDevice,
     appearance,
+    playbackSettings,
     togglePlayPause,
     nextTrack,
     previousTrack,
@@ -224,18 +225,22 @@ export const HiFiPlayerBar: React.FC = () => {
           </button>
         </div>
 
-        {/* Seekbar container with mini spectrum overlay */}
+        {/* Seekbar container (Classic, Spectrum o Híbrido) */}
         <div className="w-full flex items-center gap-2 font-mono text-[10px] text-slate-400">
           <span className="w-10 text-right">{formatTime(currentTime)}</span>
 
           <div className="flex-1 relative flex flex-col justify-center group h-6">
-            {/* Mini Spectrum Canvas under seekbar */}
-            <canvas
-              ref={miniCanvasRef}
-              width={360}
-              height={18}
-              className="absolute inset-0 w-full h-full pointer-events-none rounded opacity-80"
-            />
+            {/* Mini Spectrum Canvas under seekbar (en modo hybrid o spectrum) */}
+            {playbackSettings?.playerBarStyle !== "classic" && (
+              <canvas
+                ref={miniCanvasRef}
+                width={360}
+                height={playbackSettings?.playerBarStyle === "spectrum" ? 22 : 16}
+                className={`absolute inset-0 w-full h-full pointer-events-none rounded ${
+                  playbackSettings?.playerBarStyle === "spectrum" ? "opacity-95" : "opacity-75"
+                }`}
+              />
+            )}
 
             <input
               type="range"
@@ -245,7 +250,11 @@ export const HiFiPlayerBar: React.FC = () => {
               value={currentTime}
               onChange={handleSeek}
               disabled={duration === 0}
-              className="w-full h-1 bg-slate-800/80 rounded-lg appearance-none cursor-pointer accent-cyan-400 relative z-10 group-hover:h-1.5 transition-all"
+              className={`w-full bg-slate-800/80 rounded-lg appearance-none cursor-pointer accent-cyan-400 relative z-10 transition-all ${
+                playbackSettings?.playerBarStyle === "spectrum"
+                  ? "h-3 opacity-40 hover:opacity-70 group-hover:h-3.5"
+                  : "h-1 group-hover:h-1.5"
+              }`}
               style={{
                 accentColor: appearance.accentColor || "#06b6d4",
               }}
@@ -358,23 +367,41 @@ export const HiFiPlayerBar: React.FC = () => {
                 })}
               </div>
 
-              <div className="pt-2 mt-2 border-t border-slate-800 flex justify-between items-center text-[10px]">
+              <div className="pt-2 mt-2 border-t border-slate-800 flex justify-between items-center text-[10px] gap-2">
                 <button
                   onClick={() => setAudioSettings({ isXdssEnabled: !isXdssActive })}
-                  className={`px-2 py-0.5 rounded font-bold border ${
+                  className={`px-2 py-0.5 rounded font-bold border transition ${
                     isXdssActive
                       ? "border-amber-500 bg-amber-950/60 text-amber-300"
-                      : "border-slate-800 text-slate-500"
+                      : "border-slate-800 text-slate-500 hover:text-slate-300"
                   }`}
+                  title="Realce dinámico de graves y armónicos XDSS"
                 >
-                  ⚡ XDSS Dynamic Punch
+                  ⚡ XDSS Dynamic
                 </button>
-                <button
-                  onClick={() => setAudioSettings({ eqGains: [0,0,0,0,0,0,0,0,0,0] })}
-                  className="text-slate-400 hover:text-white underline"
-                >
-                  Reset 0dB
-                </button>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setAudioSettings({ eqGains: [4, 3, 2, 0, 0, 0, 1, 2, 3, 3] })}
+                    className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
+                    title="Realce de graves y agudos"
+                  >
+                    Rock
+                  </button>
+                  <button
+                    onClick={() => setAudioSettings({ eqGains: [5, 4, 3, 1, 0, 0, 0, 0, 1, 1] })}
+                    className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
+                    title="Realce de graves profundos"
+                  >
+                    Bass
+                  </button>
+                  <button
+                    onClick={() => setAudioSettings({ eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] })}
+                    className="text-slate-400 hover:text-white underline text-[9px]"
+                  >
+                    Reset 0dB
+                  </button>
+                </div>
               </div>
             </div>
           )}

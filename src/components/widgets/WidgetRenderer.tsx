@@ -6,6 +6,7 @@ import { CoverWidget } from "./CoverWidget.tsx";
 import { InspectorWidget } from "./InspectorWidget.tsx";
 import { EqBarsWidget } from "./EqBarsWidget.tsx";
 import { DacTelemetryWidget } from "./DacTelemetryWidget.tsx";
+import { StandaloneSpectrumWidget } from "./StandaloneSpectrumWidget.tsx";
 import { QueueWidget } from "./QueueWidget.tsx";
 
 interface WidgetRendererProps {
@@ -24,6 +25,8 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
       return <InspectorWidget />;
     case "eq_bars":
       return <EqBarsWidget />;
+    case "spectrum":
+      return <StandaloneSpectrumWidget />;
     case "dac_telemetry":
       return <DacTelemetryWidget />;
     case "queue":

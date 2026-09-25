@@ -35,6 +35,8 @@ export const VirtualTrackList: React.FC = () => {
   const {
     libraryTracks,
     currentTrack,
+    currentCoverArt,
+    playbackSettings,
     isPlaying,
     setQueue,
     addToQueue,
@@ -216,14 +218,26 @@ export const VirtualTrackList: React.FC = () => {
 
       {/* Contenedor Virtualizado con @tanstack/react-virtual */}
       <div ref={parentRef} className="flex-1 overflow-y-auto w-full relative">
+        {/* Difuminado de la carátula del álbum en el fondo de la lista */}
+        {playbackSettings?.diffuseAlbumArt && currentCoverArt && (
+          <div
+            className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center filter blur-3xl transition-opacity duration-700"
+            style={{
+              backgroundImage: `url(${currentCoverArt})`,
+              opacity: (playbackSettings.diffuseAlbumArtOpacity ?? 25) / 100,
+            }}
+          />
+        )}
+
         {sortedTracks.length === 0 ? (
-          <div className="py-20 text-center text-audiophile-muted font-sans text-xs">
+          <div className="relative z-10 py-20 text-center text-audiophile-muted font-sans text-xs">
             {scanStatus.is_scanning
               ? "Indexando archivos de audio en segundo plano..."
               : "No se encontraron temas en la base de datos."}
           </div>
         ) : (
           <div
+            className="relative z-10"
             style={{
               height: `${rowVirtualizer.getTotalSize()}px`,
               width: "100%",
@@ -237,6 +251,7 @@ export const VirtualTrackList: React.FC = () => {
               return (
                 <div
                   key={track.filepath}
+                  onClick={() => handleRowDoubleClick(track, virtualRow.index)}
                   onDoubleClick={() => handleRowDoubleClick(track, virtualRow.index)}
                   onContextMenu={(e) => handleContextMenu(e, track)}
                   style={{
@@ -262,7 +277,7 @@ export const VirtualTrackList: React.FC = () => {
                   </div>
 
                   <div className="flex-1 min-w-[180px] truncate pr-2">
-                    <span className="truncate group-hover:text-white">
+                    <span className="truncate group-hover:text-white hover-marquee" title={track.title}>
                       {track.title}
                     </span>
                   </div>

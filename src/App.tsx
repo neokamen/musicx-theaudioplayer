@@ -5,7 +5,15 @@ import { SettingsModal } from "./components/settings/SettingsModal.tsx";
 import { useMusicStore } from "./store/index.ts";
 
 export default function App() {
-  const { initListeners, telemetry, appearance, setSettingsOpen } = useMusicStore();
+  const {
+    initListeners,
+    telemetry,
+    appearance,
+    playbackSettings,
+    setSettingsOpen,
+    addToQueue,
+    play,
+  } = useMusicStore();
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
@@ -18,7 +26,59 @@ export default function App() {
     };
   }, [initListeners]);
 
-  // CSS variables for dynamic accent and custom styling
+  // Sincronizar variables CSS dinámicas para apariencia en toda la aplicación
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--app-bg", appearance.bgColor || "#090d16");
+    root.style.setProperty("--app-surface", appearance.bgColor ? `${appearance.bgColor}ee` : "#0c1220");
+    root.style.setProperty("--app-surface2", appearance.bgColor ? `${appearance.bgColor}cc` : "#131b2e");
+    root.style.setProperty("--app-accent", appearance.accentColor || "#06b6d4");
+    root.style.setProperty(
+      "--app-border",
+      appearance.borderEffect
+        ? `rgba(255, 255, 255, ${(appearance.borderOpacity ?? 40) / 250})`
+        : "rgba(51, 65, 85, 0.4)"
+    );
+    root.style.setProperty("--app-radius", `${appearance.borderRadius ?? 8}px`);
+    root.style.setProperty("--app-blur", `${appearance.glassBlur ?? 10}px`);
+  }, [appearance]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      const audioFiles = files.filter((f) =>
+        /\.(mp3|flac|wav|ogg|m4a|aac|opus|alac)$/i.test(f.name)
+      );
+      if (audioFiles.length > 0) {
+        const newTracks = audioFiles.map((f, idx) => ({
+          filepath: (f as { path?: string }).path || f.name,
+          title: f.name.replace(/\.[^/.]+$/, ""),
+          artist: "Archivo Arrastrado",
+          album: "Cola Temporal",
+          track_number: idx + 1,
+          duration_seconds: 0,
+          format: f.name.split(".").pop()?.toUpperCase() || "AUDIO",
+          sample_rate: 44100,
+          bit_depth: 16,
+          bitrate_kbps: 1411,
+          file_size: f.size,
+          mtime: Date.now(),
+        }));
+        addToQueue(newTracks);
+        if (playbackSettings?.autoPlayOnDrop && newTracks.length > 0) {
+          play(newTracks[0]);
+        }
+      }
+    }
+  };
+
   const customStyles: React.CSSProperties = {
     backgroundColor: appearance.bgColor || "#090d16",
     color: "#f8fafc",
@@ -29,6 +89,8 @@ export default function App() {
 
   return (
     <div
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       className="flex flex-col h-screen w-screen text-slate-100 select-none font-sans overflow-hidden transition-colors duration-300"
       style={customStyles}
     >
