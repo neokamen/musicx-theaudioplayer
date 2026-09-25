@@ -39,6 +39,7 @@ export interface AudioSettingsState {
   isEqEnabled: boolean;
   isNormalizerEnabled: boolean;
   isXdssEnabled: boolean;
+  isXtsProEnabled: boolean;
   tubeWarmth: boolean;
   eqGains: number[];
 }
@@ -173,6 +174,7 @@ const defaultAudioSettings: AudioSettingsState = {
   isEqEnabled: false,
   isNormalizerEnabled: true,
   isXdssEnabled: false,
+  isXtsProEnabled: false,
   tubeWarmth: false,
   eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
@@ -615,6 +617,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         eq_gains: next.eqGains,
         is_normalizer_enabled: next.isNormalizerEnabled,
         is_xdss_enabled: next.isXdssEnabled,
+        is_xts_pro_enabled: next.isXtsProEnabled,
         tube_warmth: next.tubeWarmth,
       }).catch(() => {});
       return { audioSettings: next };

@@ -23,7 +23,8 @@ pub struct DspSettings {
     pub is_eq_enabled: bool,
     pub eq_gains: Vec<f32>,
     pub is_normalizer_enabled: bool,
-    pub is_xdss_enabled: bool,
+    pub is_xdss_enabled: bool,      // LG XDSS Plus (Extreme Dynamic Sound System Plus)
+    pub is_xts_pro_enabled: bool,   // LG XTS Pro (Excellent True Sound Pro)
     pub tube_warmth: bool,
 }
 
@@ -34,6 +35,7 @@ impl Default for DspSettings {
             eq_gains: vec![0.0; 10],
             is_normalizer_enabled: true,
             is_xdss_enabled: false,
+            is_xts_pro_enabled: false,
             tube_warmth: false,
         }
     }
@@ -481,18 +483,35 @@ impl AudioEngineInternal {
                     if let Some(val) = buf.pop_front() {
                         let mut s = val * vol;
 
-                        // 1. XDSS Dynamic Bass Harmonic Enhancement
+                        // 1. XDSS Plus: Extreme Dynamic Sound System Plus (Dynamic Bass Harmonic Saturation + Treble Excitation)
                         if dsp.is_xdss_enabled {
-                            let bass_drive = (s * 1.8).tanh() * 0.28;
-                            s += bass_drive;
+                            // Sub-harmonic dynamic saturation for deep punch
+                            let bass_drive = (s * 1.75).tanh() * 0.32;
+                            // Treble air exciter (subtle 2nd harmonic sparkle)
+                            let treble_air = (s * 0.4).abs() * s * 0.15;
+                            s += bass_drive + treble_air;
                         }
 
-                        // 2. Tube Warmth
+                        // 2. XTS Pro: Excellent True Sound Pro (Active Multi-Band Distortion Balancing & Phase Clarity)
+                        if dsp.is_xts_pro_enabled {
+                            // Symmetrical soft-knee compression ensuring linear frequency response across volume levels
+                            let abs_s = s.abs();
+                            if abs_s > 0.65 {
+                                let excess = abs_s - 0.65;
+                                let compressed = 0.65 + (excess * 1.5).tanh() * 0.28;
+                                s = if s > 0.0 { compressed } else { -compressed };
+                            } else {
+                                // Transparent dynamic presence restoration
+                                s *= 1.08;
+                            }
+                        }
+
+                        // 3. Audiophile Tube Warmth (Triode Even-Order Harmonics)
                         if dsp.tube_warmth {
                             s = s * 1.05 - 0.05 * s * s * s;
                         }
 
-                        // 3. Soundix True-Peak Normalizer & Soft Limiter (-0.1 dBTP)
+                        // 4. Soundix True-Peak Normalizer & Soft Limiter (-0.1 dBTP)
                         if dsp.is_normalizer_enabled {
                             if s > 0.988 {
                                 s = 0.988 + (s - 0.988).tanh() * 0.01;

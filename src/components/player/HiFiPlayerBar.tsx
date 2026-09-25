@@ -81,6 +81,7 @@ export const HiFiPlayerBar: React.FC = () => {
   const isEqActive = audioSettings?.isEqEnabled ?? false;
   const isNormActive = audioSettings?.isNormalizerEnabled ?? false;
   const isXdssActive = audioSettings?.isXdssEnabled ?? false;
+  const isXtsProActive = audioSettings?.isXtsProEnabled ?? false;
   const eqGains = audioSettings?.eqGains || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   const maxVolumeLimit = audioSettings?.allowExtraVolumeBoost ? 1.25 : 1.0;
@@ -367,40 +368,55 @@ export const HiFiPlayerBar: React.FC = () => {
                 })}
               </div>
 
-              <div className="pt-2 mt-2 border-t border-slate-800 flex justify-between items-center text-[10px] gap-2">
-                <button
-                  onClick={() => setAudioSettings({ isXdssEnabled: !isXdssActive })}
-                  className={`px-2 py-0.5 rounded font-bold border transition ${
-                    isXdssActive
-                      ? "border-amber-500 bg-amber-950/60 text-amber-300"
-                      : "border-slate-800 text-slate-500 hover:text-slate-300"
-                  }`}
-                  title="Realce dinámico de graves y armónicos XDSS"
-                >
-                  ⚡ XDSS Dynamic
-                </button>
+              <div className="pt-2 mt-2 border-t border-slate-800 flex flex-col gap-2 text-[10px]">
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setAudioSettings({ isXdssEnabled: !isXdssActive, isXtsProEnabled: false })}
+                      className={`px-2 py-0.5 rounded font-bold border transition ${
+                        isXdssActive
+                          ? "border-amber-500 bg-amber-950/60 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                          : "border-slate-800 text-slate-500 hover:text-slate-300"
+                      }`}
+                      title="LG XDSS Plus: Realce dinámico extremo de graves y agudos"
+                    >
+                      ⚡ XDSS Plus
+                    </button>
+                    <button
+                      onClick={() => setAudioSettings({ isXtsProEnabled: !isXtsProActive, isXdssEnabled: false })}
+                      className={`px-2 py-0.5 rounded font-bold border transition ${
+                        isXtsProActive
+                          ? "border-cyan-400 bg-cyan-950/60 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]"
+                          : "border-slate-800 text-slate-500 hover:text-slate-300"
+                      }`}
+                      title="LG XTS Pro: Excelente sonido puro, balance espectral y anti-distorsión"
+                    >
+                      ✨ XTS Pro
+                    </button>
+                  </div>
 
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setAudioSettings({ eqGains: [4, 3, 2, 0, 0, 0, 1, 2, 3, 3] })}
-                    className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
-                    title="Realce de graves y agudos"
-                  >
-                    Rock
-                  </button>
-                  <button
-                    onClick={() => setAudioSettings({ eqGains: [5, 4, 3, 1, 0, 0, 0, 0, 1, 1] })}
-                    className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
-                    title="Realce de graves profundos"
-                  >
-                    Bass
-                  </button>
-                  <button
-                    onClick={() => setAudioSettings({ eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] })}
-                    className="text-slate-400 hover:text-white underline text-[9px]"
-                  >
-                    Reset 0dB
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setAudioSettings({ eqGains: [4, 3, 2, 0, 0, 0, 1, 2, 3, 3], isEqEnabled: true })}
+                      className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
+                      title="Preset Rock"
+                    >
+                      Rock
+                    </button>
+                    <button
+                      onClick={() => setAudioSettings({ eqGains: [5, 4, 3, 1, 0, 0, 0, 0, 1, 1], isEqEnabled: true })}
+                      className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
+                      title="Preset Bass"
+                    >
+                      Bass
+                    </button>
+                    <button
+                      onClick={() => setAudioSettings({ eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] })}
+                      className="text-slate-400 hover:text-white underline text-[9px]"
+                    >
+                      0dB
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
