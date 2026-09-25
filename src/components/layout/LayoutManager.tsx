@@ -128,8 +128,8 @@ export const LayoutManager: React.FC = () => {
   };
 
   const handleResetLayout = () => {
-    resetLayoutStorage();
-    setLayout(DEFAULT_LAYOUT);
+    const reset = resetLayoutStorage();
+    setLayout(reset);
   };
 
   return (
@@ -141,7 +141,7 @@ export const LayoutManager: React.FC = () => {
             Arquitectura de Paneles:
           </span>
           <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-audiophile-surface2 border border-audiophile-border text-audiophile-cyan">
-            Ventanas Modulares
+            Fooyin / Foobar Modular
           </span>
         </div>
 

@@ -189,18 +189,3 @@ pub fn get_track_cover_art(path: String) -> Option<String> {
 
     None
 }
-
-#[tauri::command]
-pub fn set_dsp_settings(
-    xdss: bool,
-    normalizer: bool,
-    eq_gains: Vec<f32>,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state.audio.send(AudioCommand::SetDspSettings {
-        xdss,
-        normalizer,
-        eq_gains,
-    });
-    Ok(())
-}

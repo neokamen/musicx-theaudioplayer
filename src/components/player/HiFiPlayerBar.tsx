@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import { useMusicStore } from "../../store/index.ts";
 import {
   Play,
@@ -10,9 +10,7 @@ import {
   Shuffle,
   Repeat,
   Repeat1,
-  Speaker,
-  Sliders,
-  Sparkles,
+  Cpu,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -31,26 +29,16 @@ export const HiFiPlayerBar: React.FC = () => {
     currentCoverArt,
     shuffle,
     repeat,
+    bitPerfectMode,
     audioSettings,
-    availableDevices,
-    selectedDevice,
-    appearance,
     togglePlayPause,
     nextTrack,
     previousTrack,
     seek,
     setVolume,
-    setOutputDevice,
     toggleShuffle,
     cycleRepeat,
-    setAudioSettings,
   } = useMusicStore();
-
-  const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false);
-  const [isEqPopupOpen, setIsEqPopupOpen] = useState(false);
-  const [isNormPopupOpen, setIsNormPopupOpen] = useState(false);
-
-  const miniCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const currentTime = telemetry.current_time || 0;
   const duration = telemetry.duration || currentTrack?.duration_seconds || 0;
@@ -62,6 +50,7 @@ export const HiFiPlayerBar: React.FC = () => {
 
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = parseFloat(e.target.value);
+    // Magnetic lock at 100% (1.0) when dragging near 1.0
     if (val > 0.97 && val < 1.03) {
       val = 1.0;
     }
@@ -70,61 +59,31 @@ export const HiFiPlayerBar: React.FC = () => {
 
   const title = telemetry.track_title || currentTrack?.title || "musicx Hi-Fi Player";
   const artist = telemetry.track_artist || currentTrack?.artist || "Listo para reproducir";
+
+  // Formato del códec
   const format = currentTrack?.format || (telemetry.filepath ? telemetry.filepath.split(".").pop()?.toUpperCase() : "PCM");
 
-  const channels = telemetry.channels || 2;
-  const isMono = channels === 1;
+  // Telemetría DAC
+  const isBitPerfect = bitPerfectMode || telemetry.is_bit_perfect;
+  const sampleRateKhz = telemetry.sample_rate ? (telemetry.sample_rate / 1000).toFixed(1) : "44.1";
+  const bitDepth = telemetry.bits_per_sample ? `${telemetry.bits_per_sample}-bit` : "16-bit";
+  const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 1411;
 
-  const isEqActive = audioSettings?.isEqEnabled ?? false;
-  const isNormActive = audioSettings?.isNormalizerEnabled ?? false;
-  const eqGains = audioSettings?.eqGains || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  // Driver de salida
+  const isAlsaDirect = telemetry.output_device.toLowerCase().includes("hw:") || isBitPerfect;
+  const driverLabel = isAlsaDirect ? "ALSA: Bit-Perfect" : telemetry.output_device.includes("Default") ? "PipeWire / Shared" : telemetry.output_device;
 
   const maxVolumeLimit = audioSettings?.allowExtraVolumeBoost ? 1.25 : 1.0;
-  const volPercent = Math.round(volume * 100);
-
-  // Mini canvas spectrum underneath seek bar
-  useEffect(() => {
-    const canvas = miniCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animId: number;
-    const accent = appearance.accentColor || "#06b6d4";
-
-    const renderMini = () => {
-      animId = requestAnimationFrame(renderMini);
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-
-      if (!isPlaying || telemetry.state !== "Playing" || volume === 0) return;
-
-      const bands = telemetry.spectrum && telemetry.spectrum.length > 0 ? telemetry.spectrum : [];
-      const count = 32;
-      const barW = w / count;
-
-      for (let i = 0; i < count; i++) {
-        const bandVal = bands[i % bands.length] || 0;
-        const barH = bandVal * h * 0.9;
-        ctx.fillStyle = accent;
-        ctx.fillRect(i * barW, h - barH, barW - 1, barH);
-      }
-    };
-
-    animId = requestAnimationFrame(renderMini);
-    return () => cancelAnimationFrame(animId);
-  }, [isPlaying, volume, telemetry.spectrum, appearance.accentColor]);
 
   return (
-    <footer className="h-24 border-t border-audiophile-border bg-audiophile-surface px-4 flex items-center justify-between gap-4 font-sans select-none z-40 shrink-0 relative">
-      {/* 1. Track Info con Carátula & Título con Scroll Marquee */}
-      <div className="flex items-center gap-3 w-1/4 min-w-[230px] overflow-hidden">
+    <footer className="h-20 border-t border-audiophile-border bg-audiophile-surface px-4 flex items-center justify-between gap-4 font-sans select-none z-40 shrink-0">
+      {/* 1. Track Info con Carátula / Badge de Códec */}
+      <div className="flex items-center gap-3 w-1/4 min-w-[220px] overflow-hidden">
         {currentCoverArt ? (
           <img
             src={currentCoverArt}
-            alt="Cover"
-            className="w-13 h-13 rounded-lg object-cover border border-audiophile-border shrink-0 shadow-md"
+            alt="Track Cover"
+            className="w-12 h-12 rounded-lg object-cover border border-audiophile-border shrink-0 shadow-md"
           />
         ) : (
           <div className="w-12 h-12 rounded-lg bg-audiophile-base border border-audiophile-border flex flex-col items-center justify-center shrink-0 shadow-inner">
@@ -137,8 +96,8 @@ export const HiFiPlayerBar: React.FC = () => {
           </div>
         )}
 
-        <div className="overflow-hidden flex-1 group">
-          <div className="font-semibold text-xs text-white whitespace-nowrap overflow-hidden text-ellipsis group-hover:animate-marquee">
+        <div className="truncate">
+          <div className="font-semibold text-xs text-white truncate flex items-center gap-1.5" title={title}>
             <span>{title}</span>
           </div>
           <div className="text-[11px] text-audiophile-muted truncate mt-0.5" title={artist}>
@@ -147,7 +106,7 @@ export const HiFiPlayerBar: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Controles de Transporte, Barra de Seek & Espectro Fino Adaptado */}
+      {/* 2. Controles de Transporte y Barra de Seek Precisa */}
       <div className="flex-1 max-w-xl flex flex-col items-center gap-1">
         <div className="flex items-center gap-3">
           <button
@@ -199,202 +158,71 @@ export const HiFiPlayerBar: React.FC = () => {
           </button>
         </div>
 
-        {/* Barra de seek y Espectro Fino */}
-        <div className="w-full flex flex-col gap-0.5">
-          <div className="w-full flex items-center gap-2 font-mono text-[10px] text-audiophile-muted">
-            <span className="w-10 text-right">{formatTime(currentTime)}</span>
-            <div className="flex-1 relative flex items-center group">
-              <input
-                type="range"
-                min={0}
-                max={duration || 100}
-                step={0.1}
-                value={currentTime}
-                onChange={handleSeek}
-                disabled={duration === 0}
-                className="w-full h-1 bg-audiophile-border rounded-lg appearance-none cursor-pointer accent-audiophile-cyan group-hover:h-1.5 transition-all"
-              />
-            </div>
-            <span className="w-10 text-left">{formatTime(duration)}</span>
+        {/* Barra de seek con precisión milimétrica */}
+        <div className="w-full flex items-center gap-2 font-mono text-[10px] text-audiophile-muted">
+          <span className="w-10 text-right">{formatTime(currentTime)}</span>
+          <div className="flex-1 relative flex items-center group">
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeek}
+              disabled={duration === 0}
+              className="w-full h-1 bg-audiophile-border rounded-lg appearance-none cursor-pointer accent-audiophile-cyan group-hover:h-1.5 transition-all"
+            />
           </div>
-
-          {/* Mini Espectro de la Canción fino con acento */}
-          <div className="w-full h-2 px-12 overflow-hidden opacity-80">
-            <canvas ref={miniCanvasRef} width={400} height={10} className="w-full h-full block" />
-          </div>
+          <span className="w-10 text-left">{formatTime(duration)}</span>
         </div>
       </div>
 
-      {/* 3. Bloque de Salida, DSP (EQ, NORM), Stereo/Mono & Volumen con Boost */}
-      <div className="flex items-center justify-end gap-3 w-1/3 min-w-[340px]">
-        {/* Indicador STEREO / MONO con iluminación fina */}
-        <div className="flex items-center gap-1 font-mono text-[9px] px-1.5 py-0.5 rounded bg-audiophile-base border border-audiophile-border/80">
-          <span className={`font-bold transition-colors ${!isMono ? "text-audiophile-cyan shadow-sm shadow-audiophile-cyan/50" : "text-audiophile-muted/40"}`}>
-            STEREO
-          </span>
-          <span className="text-audiophile-muted/30">/</span>
-          <span className={`font-bold transition-colors ${isMono ? "text-amber-400 shadow-sm shadow-amber-400/50" : "text-audiophile-muted/40"}`}>
-            MONO
-          </span>
-        </div>
-
-        {/* Botón EQ con popup */}
-        <div className="relative">
-          <div className="flex items-center bg-audiophile-base border border-audiophile-border rounded">
-            <button
-              onClick={() => setAudioSettings({ isEqEnabled: !isEqActive })}
-              className={`px-2 py-1 text-[10px] font-mono font-bold transition-all ${
-                isEqActive
-                  ? "text-audiophile-cyan shadow-[0_0_8px_rgba(6,182,212,0.4)]"
-                  : "text-audiophile-muted hover:text-white"
-              }`}
-              title="Activar/Desactivar Ecualizador"
-            >
-              EQ
-            </button>
-            <button
-              onClick={() => setIsEqPopupOpen(!isEqPopupOpen)}
-              className="px-1 py-1 text-[9px] text-audiophile-muted hover:text-audiophile-cyan border-l border-audiophile-border"
-              title="Abrir panel de Ecualizador"
-            >
-              +
-            </button>
+      {/* 3. Bloque de Telemetría Hi-Fi estilo Rack & Control de Volumen con Boost e Imán */}
+      <div className="flex items-center justify-end gap-4 w-1/3 min-w-[300px]">
+        {/* Rack Hi-Fi Digital Display */}
+        <div className="bg-audiophile-base border border-audiophile-border/90 rounded-lg px-3 py-1.5 font-mono flex items-center gap-3 shadow-inner">
+          {/* Frecuencia y Bits Reales */}
+          <div className="flex flex-col text-right">
+            <span className="text-[10px] font-bold text-audiophile-cyan tracking-wider">
+              {sampleRateKhz} kHz
+            </span>
+            <span className="text-[9px] text-audiophile-amber">
+              {bitDepth}
+            </span>
           </div>
 
-          {/* Popup Ecualizador Rápido */}
-          {isEqPopupOpen && (
-            <div className="absolute bottom-12 right-0 w-80 p-3 rounded-xl bg-slate-950/95 border border-cyan-500/50 shadow-2xl z-50 animate-fadeIn font-mono text-xs">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                <span className="font-bold text-cyan-400 flex items-center gap-1.5 text-[11px]">
-                  <Sliders size={12} /> Ecualizador Rápido (10 Bandas)
-                </span>
-                <button
-                  onClick={() => setIsEqPopupOpen(false)}
-                  className="text-slate-400 hover:text-white text-xs"
-                >
-                  ✕
-                </button>
-              </div>
+          <div className="w-[1px] h-7 bg-audiophile-border/80" />
 
-              <div className="grid grid-cols-5 gap-2 py-1">
-                {eqGains.slice(0, 5).map((gain, i) => (
-                  <div key={i} className="flex flex-col items-center gap-1">
-                    <span className="text-[9px] text-slate-400">{i === 0 ? "31Hz" : i === 1 ? "125Hz" : i === 2 ? "500Hz" : i === 3 ? "2kHz" : "8kHz"}</span>
-                    <input
-                      type="range"
-                      min="-12"
-                      max="12"
-                      value={gain}
-                      onChange={(e) => {
-                        const next = [...eqGains];
-                        next[i] = Number(e.target.value);
-                        setAudioSettings({ eqGains: next });
-                      }}
-                      className="w-12 h-1 accent-cyan-400"
-                    />
-                    <span className="text-[8px] text-cyan-300">{gain}dB</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Botón Normalizador con popup */}
-        <div className="relative">
-          <div className="flex items-center bg-audiophile-base border border-audiophile-border rounded">
-            <button
-              onClick={() => setAudioSettings({ isNormalizerEnabled: !isNormActive })}
-              className={`px-2 py-1 text-[10px] font-mono font-bold transition-all ${
-                isNormActive
-                  ? "text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
-                  : "text-audiophile-muted hover:text-white"
-              }`}
-              title="Normalizador de Picos"
-            >
-              NORM
-            </button>
-            <button
-              onClick={() => setIsNormPopupOpen(!isNormPopupOpen)}
-              className="px-1 py-1 text-[9px] text-audiophile-muted hover:text-emerald-400 border-l border-audiophile-border"
-              title="Ajustes de Normalizador"
-            >
-              +
-            </button>
+          {/* Bitrate numérico en tiempo real */}
+          <div className="flex flex-col">
+            <span className="text-[10px] font-semibold text-audiophile-text flex items-center gap-1">
+              <Cpu size={10} className="text-audiophile-cyan" />
+              {bitrate > 0 ? `${bitrate} kbps` : "1411 kbps"}
+            </span>
+            {/* Indicador LED de modo de salida */}
+            <span className="text-[9px] flex items-center gap-1.5 mt-0.5 truncate max-w-[120px]">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  isBitPerfect
+                    ? "bg-audiophile-green shadow-sm shadow-audiophile-green/80 animate-pulse"
+                    : "bg-audiophile-amber"
+                }`}
+              />
+              <span className={isBitPerfect ? "text-audiophile-green font-bold" : "text-audiophile-muted"} title={driverLabel}>
+                {driverLabel}
+              </span>
+            </span>
           </div>
-
-          {/* Popup Normalizador */}
-          {isNormPopupOpen && (
-            <div className="absolute bottom-12 right-0 w-64 p-3 rounded-xl bg-slate-950/95 border border-emerald-500/50 shadow-2xl z-50 animate-fadeIn font-mono text-xs">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                <span className="font-bold text-emerald-400 flex items-center gap-1.5 text-[11px]">
-                  <Sparkles size={12} /> Normalizador Soundix
-                </span>
-                <button
-                  onClick={() => setIsNormPopupOpen(false)}
-                  className="text-slate-400 hover:text-white text-xs"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="space-y-2 text-[10px]">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Peak Limiter (-0.5 dBFS)</span>
-                  <span className="text-emerald-400 font-bold">ACTIVO</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">ReplayGain / EBU R128</span>
-                  <span className="text-emerald-400 font-bold">AUTO</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Selector de Dispositivo de Audio en Barra Inferior */}
-        <div className="relative">
-          <button
-            onClick={() => setIsDeviceMenuOpen(!isDeviceMenuOpen)}
-            className="p-1.5 rounded bg-audiophile-base border border-audiophile-border hover:border-audiophile-cyan text-audiophile-text hover:text-audiophile-cyan transition-colors"
-            title="Seleccionar Dispositivo de Salida"
-          >
-            <Speaker size={14} />
-          </button>
-
-          {isDeviceMenuOpen && (
-            <div className="absolute bottom-12 right-0 w-64 p-2 rounded-xl bg-slate-950/95 border border-slate-700 shadow-2xl z-50 animate-fadeIn font-mono text-xs space-y-1">
-              <div className="text-[10px] text-slate-400 uppercase px-2 py-1 border-b border-slate-800">
-                Dispositivos de Audio
-              </div>
-              {availableDevices.map((dev) => (
-                <button
-                  key={dev}
-                  onClick={() => {
-                    setOutputDevice(dev);
-                    setIsDeviceMenuOpen(false);
-                  }}
-                  className={`w-full text-left px-2 py-1.5 rounded text-[11px] truncate transition-colors ${
-                    selectedDevice === dev
-                      ? "bg-cyan-950/50 text-cyan-300 border border-cyan-500/40 font-bold"
-                      : "text-slate-300 hover:bg-slate-800"
-                  }`}
-                >
-                  {dev}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Control de volumen con Boost hasta 125% y texto de porcentaje en minúsculas */}
-        <div className="flex items-center gap-1.5">
+        {/* Control de volumen con Boost hasta 125% e imán en 100% */}
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setVolume(volume > 0 ? 0 : 1)}
             className="text-audiophile-muted hover:text-white transition-colors"
           >
-            {volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            {volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
-
           <div className="flex flex-col items-center">
             <input
               type="range"
@@ -403,19 +231,16 @@ export const HiFiPlayerBar: React.FC = () => {
               step={0.01}
               value={volume}
               onChange={handleVolume}
-              className={`w-18 h-1 rounded-lg appearance-none cursor-pointer ${
-                volPercent > 100 ? "accent-red-500 bg-red-950" : "accent-audiophile-cyan bg-audiophile-border"
+              className={`w-20 h-1 rounded-lg appearance-none cursor-pointer ${
+                volume > 1.0 ? "accent-amber-400 bg-amber-950" : "accent-audiophile-cyan bg-audiophile-border"
               }`}
-              title={`Volumen: ${volPercent}%`}
+              title={`Volumen: ${(volume * 100).toFixed(0)}%${volume > 1.0 ? " (Boost +25%)" : ""}`}
             />
-            {/* Porcentaje en minúsculas con acento / rojo si pasa de 100 */}
-            <span
-              className={`text-[8px] font-mono lowercase tracking-tight -mt-0.5 ${
-                volPercent > 100 ? "text-red-500 font-bold animate-pulse" : "text-audiophile-cyan font-semibold"
-              }`}
-            >
-              {volPercent}%
-            </span>
+            {volume > 1.0 && (
+              <span className="text-[8px] font-mono text-amber-400 font-bold -mt-0.5">
+                BOOST +{( (volume - 1.0) * 100 ).toFixed(0)}%
+              </span>
+            )}
           </div>
         </div>
       </div>

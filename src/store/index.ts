@@ -141,7 +141,7 @@ export interface MusicPlayerStore {
   initListeners: () => Promise<() => void>;
 }
 
-const SETTINGS_STORAGE_KEY = "musicx_settings_v1";
+const SETTINGS_STORAGE_KEY = "musicx_settings_v5";
 
 const defaultAppearance: AppearanceState = {
   accentColor: "#06b6d4", // Cyan
@@ -308,7 +308,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     const targetTrack = track ?? get().currentTrack;
     if (!targetTrack) return;
 
-    const { bitPerfectMode, selectedDevice, fetchTrackCoverArt } = get();
+    const { bitPerfectMode, selectedDevice, fetchTrackCoverArt, listeningStats } = get();
 
     await api.playTrack(
       targetTrack.filepath,
@@ -319,112 +319,152 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     // Fetch cover art concurrently
     fetchTrackCoverArt(targetTrack.filepath);
 
-    set((state) => {
-      let newQueue = state.queue;
-      let newIndex = state.queueIndex;
+    // Update listening stats
+    const nextStats = {
+      ...listeningStats,
+      totalTracksPlayed: listeningStats.totalTracksPlayed + 1,
+      totalSessions: listeningStats.totalSessions + 1,
+    };
 
-      const foundIdx = newQueue.findIndex((t) => t.filepath === targetTrack.filepath);
-      if (foundIdx === -1) {
-        newQueue = [...newQueue, targetTrack];
-        newIndex = newQueue.length - 1;
-      } else {
-        newIndex = foundIdx;
+    set((state) => {
+      const idx = state.queue.findIndex((t) => t.filepath === targetTrack.filepath);
+      let newQueue = state.queue;
+      let newIdx = idx;
+
+      if (idx === -1) {
+        newQueue = [...state.queue, targetTrack];
+        newIdx = newQueue.length - 1;
       }
+
+      saveStoredSettings({
+        language: state.language,
+        appearance: state.appearance,
+        audioSettings: state.audioSettings,
+        playbackSettings: state.playbackSettings,
+        listeningStats: nextStats,
+        librarySettings: state.librarySettings,
+      });
 
       return {
         currentTrack: targetTrack,
         isPlaying: true,
         queue: newQueue,
-        queueIndex: newIndex,
+        queueIndex: newIdx,
+        listeningStats: nextStats,
       };
     });
   },
 
   pause: async () => {
-    await api.pause();
+    await api.pauseAudio();
     set({ isPlaying: false });
   },
 
   resume: async () => {
-    await api.resume();
+    await api.resumeAudio();
     set({ isPlaying: true });
   },
 
   stop: async () => {
-    await api.stop();
+    await api.stopAudio();
     set({ isPlaying: false });
   },
 
   togglePlayPause: async () => {
-    const { isPlaying, pause, resume, play } = get();
+    const { isPlaying, currentTrack, queue, play, pause, resume } = get();
     if (isPlaying) {
       await pause();
-    } else if (get().currentTrack) {
+    } else if (currentTrack) {
       await resume();
-    } else if (get().queue.length > 0) {
-      await play(get().queue[0]);
+    } else if (queue.length > 0) {
+      await play(queue[0]);
     }
   },
 
   seek: async (seconds: number) => {
-    await api.seek(seconds);
+    await api.seekAudio(seconds);
+    set((state) => ({
+      telemetry: { ...state.telemetry, current_time: seconds },
+    }));
   },
 
   setVolume: async (vol: number) => {
-    const clamped = Math.max(0, Math.min(1, vol));
-    await api.setVolume(clamped);
-    set({ volume: clamped });
+    await api.setVolume(vol);
+    set({ volume: vol });
   },
 
   nextTrack: async () => {
-    const { queue, queueIndex, shuffle, play } = get();
+    const { queue, queueIndex, shuffle, repeat, play } = get();
     if (queue.length === 0) return;
 
-    let nextIdx = queueIndex + 1;
+    let nextIndex = queueIndex + 1;
+
     if (shuffle) {
-      nextIdx = Math.floor(Math.random() * queue.length);
-    } else if (nextIdx >= queue.length) {
-      nextIdx = 0;
+      nextIndex = Math.floor(Math.random() * queue.length);
+    } else if (nextIndex >= queue.length) {
+      if (repeat === "all") {
+        nextIndex = 0;
+      } else {
+        return;
+      }
     }
 
-    await play(queue[nextIdx]);
+    const nextTrk = queue[nextIndex];
+    if (nextTrk) {
+      await play(nextTrk);
+    }
   },
 
   previousTrack: async () => {
-    const { queue, queueIndex, play } = get();
+    const { queue, queueIndex, telemetry, seek, play } = get();
     if (queue.length === 0) return;
 
-    let prevIdx = queueIndex - 1;
-    if (prevIdx < 0) {
-      prevIdx = queue.length - 1;
+    if (telemetry.current_time > 3) {
+      await seek(0);
+      return;
     }
 
-    await play(queue[prevIdx]);
+    let prevIndex = queueIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = queue.length - 1;
+    }
+
+    const prevTrk = queue[prevIndex];
+    if (prevTrk) {
+      await play(prevTrk);
+    }
   },
 
   setQueue: async (tracks: Track[], startIndex = 0) => {
-    set({ queue: tracks, queueIndex: startIndex });
-    if (tracks[startIndex]) {
+    set({
+      queue: tracks,
+      queueIndex: startIndex,
+    });
+    if (tracks.length > 0 && startIndex >= 0 && startIndex < tracks.length) {
       await get().play(tracks[startIndex]);
     }
   },
 
   addToQueue: (track: Track | Track[]) => {
-    const toAdd = Array.isArray(track) ? track : [track];
-    set((state) => ({ queue: [...state.queue, ...toAdd] }));
+    set((state) => {
+      const toAdd = Array.isArray(track) ? track : [track];
+      return { queue: [...state.queue, ...toAdd] };
+    });
   },
 
   removeFromQueue: (index: number) => {
     set((state) => {
-      const newQueue = [...state.queue];
-      newQueue.splice(index, 1);
-      let newIdx = state.queueIndex;
+      const nextQueue = [...state.queue];
+      nextQueue.splice(index, 1);
+      let nextIndex = state.queueIndex;
       if (index < state.queueIndex) {
-        newIdx--;
+        nextIndex--;
       } else if (index === state.queueIndex) {
-        newIdx = Math.min(newIdx, newQueue.length - 1);
+        if (nextIndex >= nextQueue.length) {
+          nextIndex = nextQueue.length - 1;
+        }
       }
-      return { queue: newQueue, queueIndex: newIdx };
+      return { queue: nextQueue, queueIndex: nextIndex };
     });
   },
 
@@ -439,42 +479,38 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   cycleRepeat: () => {
     set((state) => {
       const modes: RepeatMode[] = ["off", "all", "one"];
-      const nextIdx = (modes.indexOf(state.repeat) + 1) % modes.length;
+      const currentIdx = modes.indexOf(state.repeat);
+      const nextIdx = (currentIdx + 1) % modes.length;
       return { repeat: modes[nextIdx] };
     });
   },
 
   setBitPerfectMode: async (enabled: boolean) => {
-    const { selectedDevice } = get();
+    await api.setBitPerfect(enabled);
     set({ bitPerfectMode: enabled });
-    await api.setOutputDevice(
-      selectedDevice === "Default" ? undefined : selectedDevice,
-      enabled
-    );
   },
 
   setOutputDevice: async (deviceName: string) => {
-    const { bitPerfectMode } = get();
+    await api.setOutputDevice(deviceName);
     set({ selectedDevice: deviceName });
-    await api.setOutputDevice(
-      deviceName === "Default" ? undefined : deviceName,
-      bitPerfectMode
-    );
   },
 
   refreshAudioDevices: async () => {
     try {
-      const devices = await api.listAudioDevices();
-      set({ availableDevices: ["Default", ...devices] });
+      const devices = await api.getAudioDevices();
+      set({ availableDevices: devices });
     } catch {
-      // Fallback
+      // Ignore
     }
   },
 
   fetchLibraryTracks: async (query?: string) => {
     try {
-      const tracks = await api.getTracksFromDb(query);
-      set({ libraryTracks: tracks, librarySearchQuery: query || "" });
+      const tracks = await api.searchTracks(query || "");
+      set({
+        libraryTracks: tracks,
+        librarySearchQuery: query || "",
+      });
     } catch {
       // Ignore
     }
@@ -482,11 +518,9 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
 
   startDirectoryScan: async (path: string, force = false) => {
     try {
-      set({ scanStatus: { is_scanning: true, current: 0, total: 0, current_path: path } });
-      await api.triggerScan(path, force);
-    } catch (err: unknown) {
-      set({ scanStatus: { is_scanning: false, current: 0, total: 0 } });
-      console.error("Failed to start directory scan:", err);
+      await api.scanDirectory(path, force);
+    } catch {
+      // Ignore
     }
   },
 
@@ -494,11 +528,10 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     set((state) => ({
       explorer: { ...state.explorer, isLoading: true, error: null },
     }));
-
     try {
-      const entries = await api.readDirectoryLazy(path);
+      const entries = await api.readDirectory(path);
       set((state) => {
-        const history = state.explorer.history.slice(0, state.explorer.historyIndex + 1);
+        const history = [...state.explorer.history];
         if (history[history.length - 1] !== path) {
           history.push(path);
         }

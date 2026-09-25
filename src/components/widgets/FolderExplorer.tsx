@@ -16,7 +16,6 @@ import {
   List,
   Table,
   LayoutGrid,
-  CornerLeftUp,
 } from "lucide-react";
 import type { FileNode } from "../../types/index.ts";
 
@@ -82,7 +81,7 @@ export const FolderExplorer: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans text-xs overflow-hidden">
-      {/* Barra superior estilo Dolphin con Breadcrumbs & Selector de Vista */}
+      {/* Barra de navegación superior estilo Dolphin con Breadcrumbs & Selector de Vista */}
       <div className="p-2 border-b border-audiophile-border bg-audiophile-surface2 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1">
@@ -120,7 +119,7 @@ export const FolderExplorer: React.FC = () => {
             {/* Separador */}
             <div className="w-[1px] h-4 bg-audiophile-border mx-1" />
 
-            {/* Selector de modo de vista (Compacto, Detalles, Iconos) */}
+            {/* Selector de modo de vista estilo Dolphin (Compacto, Detalles, Iconos) */}
             <div className="flex items-center bg-audiophile-base border border-audiophile-border rounded p-0.5 gap-0.5">
               <button
                 onClick={() => setViewMode("compact")}
@@ -245,20 +244,8 @@ export const FolderExplorer: React.FC = () => {
         </div>
       </div>
 
-      {/* Lista / Grid de Archivos con Entrada '..' siempre arriba */}
+      {/* Vista de Archivos y Carpetas (Compacta, Detalles, Cuadrícula) */}
       <div className="flex-1 overflow-y-auto p-1 font-mono text-[11px]">
-        {/* Entrada '..' para subir de carpeta */}
-        {explorer.currentPath !== "/" && (
-          <div
-            onClick={navigateUp}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-audiophile-surface2 cursor-pointer text-audiophile-muted hover:text-audiophile-cyan transition-colors mb-0.5 border-b border-audiophile-border/30"
-            title="Subir al directorio superior"
-          >
-            <CornerLeftUp size={14} className="text-audiophile-cyan shrink-0" />
-            <span className="font-bold">.. [Directorio Superior]</span>
-          </div>
-        )}
-
         {explorer.error ? (
           <div className="p-6 text-center text-red-400 font-sans text-xs">
             {explorer.error}
@@ -280,20 +267,16 @@ export const FolderExplorer: React.FC = () => {
                 {filteredEntries.map((entry: FileNode) => (
                   <div
                     key={entry.path}
-                    draggable={!entry.is_dir}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", entry.path);
-                    }}
                     onDoubleClick={() => handleEntryClick(entry)}
                     className="flex items-center justify-between px-2.5 py-1.5 rounded hover:bg-audiophile-surface2 cursor-pointer group transition-colors"
                   >
-                    <div className="flex items-center gap-2.5 overflow-hidden flex-1">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
                       {entry.is_dir ? (
                         <Folder size={14} className="text-audiophile-amber shrink-0" />
                       ) : (
                         <Music size={14} className="text-audiophile-cyan shrink-0" />
                       )}
-                      <span className="truncate text-audiophile-text group-hover:text-white group-hover:animate-marquee">
+                      <span className="truncate text-audiophile-text group-hover:text-white">
                         {entry.name}
                       </span>
                     </div>

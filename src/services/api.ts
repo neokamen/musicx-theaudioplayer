@@ -80,6 +80,23 @@ export async function setOutputDevice(
   });
 }
 
+export async function setBitPerfect(enabled: boolean): Promise<void> {
+  return invoke<void>("set_output_device", {
+    deviceName: undefined,
+    bitPerfect: enabled,
+  });
+}
+
+export async function setDspSettings(settings: {
+  is_eq_enabled?: boolean;
+  eq_gains?: number[];
+  is_normalizer_enabled?: boolean;
+  is_xdss_enabled?: boolean;
+  tube_warmth?: boolean;
+}): Promise<void> {
+  return invoke<void>("set_dsp_settings", { settings });
+}
+
 export async function listAudioDevices(): Promise<string[]> {
   return invoke<string[]>("list_audio_devices");
 }
@@ -137,3 +154,13 @@ export async function onTrackEnded(
     callback(event.payload);
   });
 }
+
+// Aliases
+export const pauseAudio = pause;
+export const resumeAudio = resume;
+export const stopAudio = stop;
+export const seekAudio = seek;
+export const getAudioDevices = listAudioDevices;
+export const readDirectory = readDirectoryLazy;
+export const scanDirectory = triggerScan;
+export const searchTracks = getTracksFromDb;
