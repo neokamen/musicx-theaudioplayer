@@ -1,127 +1,95 @@
 import React from "react";
 import { useMusicStore } from "../../store/index.ts";
-import { Activity, ShieldCheck, Zap, Speaker, Sliders } from "lucide-react";
+import { Activity, ShieldCheck } from "lucide-react";
 import { SpectrumVisualizer } from "./SpectrumVisualizer.tsx";
 
 export const DacTelemetryWidget: React.FC = () => {
   const {
     telemetry,
-    availableDevices,
-    selectedDevice,
+    currentTrack,
     bitPerfectMode,
-    setOutputDevice,
+    appearance,
     setBitPerfectMode,
   } = useMusicStore();
 
   const isBitPerfect = bitPerfectMode || telemetry.is_bit_perfect;
-  // Use active telemetry sample rate or clean 44.1 kHz fallback when stopped
-  const sampleRateKhz = telemetry.sample_rate > 0 
-    ? (telemetry.sample_rate / 1000).toFixed(1) 
+  const sampleRateKhz = telemetry.sample_rate > 0
+    ? (telemetry.sample_rate / 1000).toFixed(1)
     : "44.1";
-  const bitDepth = telemetry.bits_per_sample > 0 
-    ? `${telemetry.bits_per_sample}-bit` 
+  const bitDepth = telemetry.bits_per_sample > 0
+    ? `${telemetry.bits_per_sample}-bit`
     : "16-bit";
+  const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 1411;
 
   return (
     <div className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans overflow-hidden text-xs">
-      <div className="p-2 border-b border-audiophile-border bg-audiophile-surface2 flex items-center justify-between">
+      {/* Header without extra box */}
+      <div className="p-2 border-b border-audiophile-border bg-audiophile-surface2 flex items-center justify-between shrink-0">
         <span className="font-mono text-[10px] uppercase tracking-wider text-audiophile-muted flex items-center gap-1.5">
-          <Activity size={12} className="text-audiophile-green animate-pulse" />
+          <Activity size={12} style={{ color: appearance.accentColor }} className="animate-pulse" />
           Telemetría DAC / ALSA Direct
-        </span>
-        <span
-          className={`font-mono text-[9px] px-1.5 py-0.5 rounded border ${
-            isBitPerfect
-              ? "bg-audiophile-green/10 text-audiophile-green border-audiophile-green/30"
-              : "bg-audiophile-border text-audiophile-muted border-transparent"
-          }`}
-        >
-          {isBitPerfect ? "BIT-PERFECT DIRECT" : "SHARED MIXER"}
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 font-mono">
-        {/* Gran Display VFD / LED Digital de Resolución */}
-        <div className="bg-audiophile-base border border-audiophile-border rounded-lg p-3 text-center shadow-inner">
-          <div className="text-[10px] uppercase text-audiophile-muted tracking-widest mb-1">
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 font-mono">
+        {/* Gran Display VFD / LED Digital de Resolución con Bitrate debajo */}
+        <div
+          className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center shadow-inner relative overflow-hidden"
+          style={{
+            borderColor: appearance.neonGlow ? `${appearance.accentColor}33` : undefined,
+          }}
+        >
+          <div className="text-[9px] uppercase text-slate-400 tracking-widest mb-0.5">
             DAC MASTER CLOCK & SAMPLE RATE
           </div>
-          <div className="text-2xl font-bold text-audiophile-cyan tracking-wider">
-            {sampleRateKhz} <span className="text-sm font-normal text-audiophile-muted">kHz</span>
+
+          <div
+            className="text-2xl font-black tracking-wider"
+            style={{ color: appearance.accentColor }}
+          >
+            {sampleRateKhz} <span className="text-xs font-normal text-slate-400">kHz</span>
           </div>
-          <div className="flex items-center justify-center gap-3 mt-2 text-[11px] text-audiophile-text border-t border-audiophile-border/40 pt-2">
-            <span>PROFUNDIDAD: <strong className="text-audiophile-amber">{bitDepth}</strong></span>
+
+          {/* Bitrate en tiempo real debajo de los kHz */}
+          <div className="text-xs font-bold text-amber-400 mt-0.5">
+            {bitrate} <span className="text-[10px] font-normal text-slate-400">kbps (Real-time Stream)</span>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 mt-2 text-[10px] text-slate-300 border-t border-slate-800/80 pt-1.5">
+            <span>PROFUNDIDAD: <strong className="text-cyan-300">{bitDepth}</strong></span>
             <span>&bull;</span>
-            <span>ESTADO: <strong className={telemetry.state === "Playing" ? "text-audiophile-green" : "text-audiophile-muted"}>{telemetry.state.toUpperCase()}</strong></span>
-          </div>
-        </div>
-
-        {/* Selector de Dispositivo de Audio */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] text-audiophile-muted uppercase flex items-center gap-1">
-            <Speaker size={11} className="text-audiophile-cyan" /> Dispositivo de Salida (CPAL / ALSA / PipeWire)
-          </label>
-          <select
-            value={selectedDevice}
-            onChange={(e) => setOutputDevice(e.target.value)}
-            className="w-full bg-audiophile-base border border-audiophile-border rounded p-1.5 text-[11px] text-audiophile-text focus:outline-none focus:border-audiophile-cyan"
-          >
-            {availableDevices.map((dev: string) => (
-              <option key={dev} value={dev}>
-                {dev}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Toggle Bit-Perfect Exclusivo */}
-        <div className="bg-audiophile-surface2 border border-audiophile-border rounded-lg p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck
-              size={18}
-              className={isBitPerfect ? "text-audiophile-green" : "text-audiophile-muted"}
-            />
-            <div>
-              <div className="font-semibold text-white text-[11px]">Modo Bit-Perfect Exclusivo</div>
-              <div className="text-[9px] text-audiophile-muted font-sans">
-                Evita remuestreo y control de volumen por software del sistema operativo.
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setBitPerfectMode(!bitPerfectMode)}
-            className={`w-9 h-5 rounded-full p-0.5 transition-colors ${
-              bitPerfectMode ? "bg-audiophile-green" : "bg-audiophile-border"
-            }`}
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                bitPerfectMode ? "translate-x-4" : "translate-x-0"
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* Telemetría Dinámica de Stream */}
-        <div className="grid grid-cols-2 gap-2 text-[10px]">
-          <div className="bg-audiophile-surface2 border border-audiophile-border/70 rounded p-2">
-            <span className="text-audiophile-muted text-[9px] block">LATENCIA ESTIMADA</span>
-            <span className="font-bold text-audiophile-text mt-0.5 block flex items-center gap-1">
-              <Zap size={10} className="text-audiophile-cyan" /> ULTRA-LOW (&lt; 5ms)
-            </span>
-          </div>
-          <div className="bg-audiophile-surface2 border border-audiophile-border/70 rounded p-2">
-            <span className="text-audiophile-muted text-[9px] block">VOLUMEN INTERNO</span>
-            <span className="font-bold text-audiophile-text mt-0.5 block flex items-center gap-1">
-              <Sliders size={10} className="text-audiophile-amber" /> {(telemetry.volume * 100).toFixed(0)}%
+            <span>
+              ESTADO:{" "}
+              <strong className={telemetry.state === "Playing" ? "text-emerald-400 font-bold" : "text-slate-500"}>
+                {telemetry.state.toUpperCase()}
+              </strong>
             </span>
           </div>
         </div>
 
-        {/* ESPECTRO DE AUDIO A TIEMPO REAL (debajo de latencia estimada) */}
-        <div className="pt-2">
-          <SpectrumVisualizer height={140} />
+        {/* Botón Bit-Perfect con efecto luminoso de contorno */}
+        <button
+          onClick={() => setBitPerfectMode(!isBitPerfect)}
+          className={`w-full py-2 px-3 rounded-lg font-mono text-xs font-bold transition flex items-center justify-center gap-2 border ${
+            isBitPerfect
+              ? "bg-slate-900 text-white"
+              : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
+          }`}
+          style={{
+            borderColor: isBitPerfect ? appearance.accentColor : undefined,
+            boxShadow: isBitPerfect
+              ? `0 0 15px ${appearance.accentColor}55, inset 0 0 10px ${appearance.accentColor}22`
+              : "none",
+            color: isBitPerfect ? appearance.accentColor : undefined,
+          }}
+        >
+          <ShieldCheck size={14} style={{ color: isBitPerfect ? appearance.accentColor : undefined }} />
+          <span>{isBitPerfect ? "ALSA BIT-PERFECT: ACTIVADO" : "MODO COMPARTIDO (PIPEWIRE)"}</span>
+        </button>
+
+        {/* Espectro a tiempo real debajo de latencia */}
+        <div className="flex-1 min-h-[100px] rounded-lg bg-slate-950 border border-slate-800/80 p-1 flex flex-col justify-end overflow-hidden">
+          <SpectrumVisualizer height={105} />
         </div>
       </div>
     </div>
