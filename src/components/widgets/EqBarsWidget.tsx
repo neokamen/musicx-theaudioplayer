@@ -7,7 +7,6 @@ export const EqBarsWidget: React.FC = () => {
 
   const isEqEnabled = audioSettings?.isEqEnabled ?? false;
   const isXdssEnabled = audioSettings?.isXdssEnabled ?? false;
-  const isXtsProEnabled = audioSettings?.isXtsProEnabled ?? false;
   const gains = audioSettings?.eqGains || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   const freqs = ["31Hz", "62Hz", "125Hz", "250Hz", "500Hz", "1kHz", "2kHz", "4kHz", "8kHz", "16kHz"];
@@ -32,29 +31,16 @@ export const EqBarsWidget: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setAudioSettings({ isXdssEnabled: !isXdssEnabled, isXtsProEnabled: false })}
+            onClick={() => setAudioSettings({ isXdssEnabled: !isXdssEnabled })}
             className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold border transition ${
               isXdssEnabled
-                ? "bg-amber-950/60 border-amber-500 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
-                : "bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200"
+                ? "bg-amber-950/60 border-amber-600 text-amber-300"
+                : "bg-slate-900 border-slate-700 text-slate-400"
             }`}
-            title="LG XDSS Plus: Realce dinámico de graves y agudos"
           >
-            ⚡ XDSS Plus
-          </button>
-
-          <button
-            onClick={() => setAudioSettings({ isXtsProEnabled: !isXtsProEnabled, isXdssEnabled: false })}
-            className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold border transition ${
-              isXtsProEnabled
-                ? "bg-cyan-950/60 border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.25)]"
-                : "bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200"
-            }`}
-            title="LG XTS Pro: Sonido puro balanceado y corrección de distorsión"
-          >
-            ✨ XTS Pro
+            ⚡ XDSS Dynamic
           </button>
 
           <button

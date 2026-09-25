@@ -92,7 +92,6 @@ export async function setDspSettings(settings: {
   eq_gains?: number[];
   is_normalizer_enabled?: boolean;
   is_xdss_enabled?: boolean;
-  is_xts_pro_enabled?: boolean;
   tube_warmth?: boolean;
 }): Promise<void> {
   return invoke<void>("set_dsp_settings", { settings });
