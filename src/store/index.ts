@@ -36,30 +36,11 @@ export interface AudioSettingsState {
   bufferLatency: "ultra_low" | "low" | "stable";
   crossfadeMs: number;
   ditherEngine: "tpdf" | "none";
-  isEqEnabled: boolean;
-  isNormalizerEnabled: boolean;
-  isXdssEnabled: boolean;
-  tubeWarmth: boolean;
-  eqGains: number[];
-}
-
-export interface PlaybackSettingsState {
-  crossfadeDurationSec: number;
-  gaplessPlayback: boolean;
-  replayGainMode: "track" | "album" | "off";
-  autoPlayOnDrop: boolean;
-}
-
-export interface ListeningStatsState {
-  totalTracksPlayed: number;
-  totalSecondsListened: number;
-  totalSessions: number;
 }
 
 export interface LibrarySettings {
   musicFolder: string;
   autoScanOnStartup: boolean;
-  totalHoursOverride?: number;
 }
 
 export interface MusicPlayerStore {
@@ -86,8 +67,6 @@ export interface MusicPlayerStore {
   language: Language;
   appearance: AppearanceState;
   audioSettings: AudioSettingsState;
-  playbackSettings: PlaybackSettingsState;
-  listeningStats: ListeningStatsState;
   librarySettings: LibrarySettings;
   isSettingsOpen: boolean;
   currentCoverArt: string | null;
@@ -95,10 +74,6 @@ export interface MusicPlayerStore {
 
   // Actions
   setAudioSettings: (settings: Partial<AudioSettingsState>) => void;
-  setPlaybackSettings: (settings: Partial<PlaybackSettingsState>) => void;
-  resetStats: () => void;
-  resetSettings: () => void;
-  clearCacheAndResidues: () => void;
   play: (track?: Track) => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
@@ -141,7 +116,7 @@ export interface MusicPlayerStore {
   initListeners: () => Promise<() => void>;
 }
 
-const SETTINGS_STORAGE_KEY = "musicx_settings_v5";
+const SETTINGS_STORAGE_KEY = "musicx_settings_v1";
 
 const defaultAppearance: AppearanceState = {
   accentColor: "#06b6d4", // Cyan
@@ -166,38 +141,17 @@ const defaultAudioSettings: AudioSettingsState = {
   bufferLatency: "ultra_low",
   crossfadeMs: 0,
   ditherEngine: "tpdf",
-  isEqEnabled: false,
-  isNormalizerEnabled: true,
-  isXdssEnabled: false,
-  tubeWarmth: false,
-  eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-};
-
-const defaultPlaybackSettings: PlaybackSettingsState = {
-  crossfadeDurationSec: 0,
-  gaplessPlayback: true,
-  replayGainMode: "track",
-  autoPlayOnDrop: true,
-};
-
-const defaultListeningStats: ListeningStatsState = {
-  totalTracksPlayed: 142,
-  totalSecondsListened: 28540,
-  totalSessions: 18,
 };
 
 const defaultLibrarySettings: LibrarySettings = {
   musicFolder: "/home",
   autoScanOnStartup: true,
-  totalHoursOverride: 7.9,
 };
 
 function loadStoredSettings(): {
   language: Language;
   appearance: AppearanceState;
   audioSettings: AudioSettingsState;
-  playbackSettings: PlaybackSettingsState;
-  listeningStats: ListeningStatsState;
   librarySettings: LibrarySettings;
 } {
   try {
@@ -208,8 +162,6 @@ function loadStoredSettings(): {
         language: parsed.language || "es",
         appearance: { ...defaultAppearance, ...(parsed.appearance || {}) },
         audioSettings: { ...defaultAudioSettings, ...(parsed.audioSettings || {}) },
-        playbackSettings: { ...defaultPlaybackSettings, ...(parsed.playbackSettings || {}) },
-        listeningStats: { ...defaultListeningStats, ...(parsed.listeningStats || {}) },
         librarySettings: { ...defaultLibrarySettings, ...(parsed.librarySettings || {}) },
       };
     }
@@ -220,8 +172,6 @@ function loadStoredSettings(): {
     language: "es",
     appearance: defaultAppearance,
     audioSettings: defaultAudioSettings,
-    playbackSettings: defaultPlaybackSettings,
-    listeningStats: defaultListeningStats,
     librarySettings: defaultLibrarySettings,
   };
 }
@@ -230,8 +180,6 @@ function saveStoredSettings(state: {
   language: Language;
   appearance: AppearanceState;
   audioSettings: AudioSettingsState;
-  playbackSettings: PlaybackSettingsState;
-  listeningStats: ListeningStatsState;
   librarySettings: LibrarySettings;
 }) {
   try {
@@ -297,8 +245,6 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   language: stored.language,
   appearance: stored.appearance,
   audioSettings: stored.audioSettings,
-  playbackSettings: stored.playbackSettings,
-  listeningStats: stored.listeningStats,
   librarySettings: stored.librarySettings,
   isSettingsOpen: false,
   currentCoverArt: null,
@@ -308,7 +254,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     const targetTrack = track ?? get().currentTrack;
     if (!targetTrack) return;
 
-    const { bitPerfectMode, selectedDevice, fetchTrackCoverArt, listeningStats } = get();
+    const { bitPerfectMode, selectedDevice, fetchTrackCoverArt } = get();
 
     await api.playTrack(
       targetTrack.filepath,
@@ -319,152 +265,112 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     // Fetch cover art concurrently
     fetchTrackCoverArt(targetTrack.filepath);
 
-    // Update listening stats
-    const nextStats = {
-      ...listeningStats,
-      totalTracksPlayed: listeningStats.totalTracksPlayed + 1,
-      totalSessions: listeningStats.totalSessions + 1,
-    };
-
     set((state) => {
-      const idx = state.queue.findIndex((t) => t.filepath === targetTrack.filepath);
       let newQueue = state.queue;
-      let newIdx = idx;
+      let newIndex = state.queueIndex;
 
-      if (idx === -1) {
-        newQueue = [...state.queue, targetTrack];
-        newIdx = newQueue.length - 1;
+      const foundIdx = newQueue.findIndex((t) => t.filepath === targetTrack.filepath);
+      if (foundIdx === -1) {
+        newQueue = [...newQueue, targetTrack];
+        newIndex = newQueue.length - 1;
+      } else {
+        newIndex = foundIdx;
       }
-
-      saveStoredSettings({
-        language: state.language,
-        appearance: state.appearance,
-        audioSettings: state.audioSettings,
-        playbackSettings: state.playbackSettings,
-        listeningStats: nextStats,
-        librarySettings: state.librarySettings,
-      });
 
       return {
         currentTrack: targetTrack,
         isPlaying: true,
         queue: newQueue,
-        queueIndex: newIdx,
-        listeningStats: nextStats,
+        queueIndex: newIndex,
       };
     });
   },
 
   pause: async () => {
-    await api.pauseAudio();
+    await api.pause();
     set({ isPlaying: false });
   },
 
   resume: async () => {
-    await api.resumeAudio();
+    await api.resume();
     set({ isPlaying: true });
   },
 
   stop: async () => {
-    await api.stopAudio();
+    await api.stop();
     set({ isPlaying: false });
   },
 
   togglePlayPause: async () => {
-    const { isPlaying, currentTrack, queue, play, pause, resume } = get();
+    const { isPlaying, pause, resume, play } = get();
     if (isPlaying) {
       await pause();
-    } else if (currentTrack) {
+    } else if (get().currentTrack) {
       await resume();
-    } else if (queue.length > 0) {
-      await play(queue[0]);
+    } else if (get().queue.length > 0) {
+      await play(get().queue[0]);
     }
   },
 
   seek: async (seconds: number) => {
-    await api.seekAudio(seconds);
-    set((state) => ({
-      telemetry: { ...state.telemetry, current_time: seconds },
-    }));
+    await api.seek(seconds);
   },
 
   setVolume: async (vol: number) => {
-    await api.setVolume(vol);
-    set({ volume: vol });
+    const clamped = Math.max(0, Math.min(1, vol));
+    await api.setVolume(clamped);
+    set({ volume: clamped });
   },
 
   nextTrack: async () => {
-    const { queue, queueIndex, shuffle, repeat, play } = get();
+    const { queue, queueIndex, shuffle, play } = get();
     if (queue.length === 0) return;
 
-    let nextIndex = queueIndex + 1;
-
+    let nextIdx = queueIndex + 1;
     if (shuffle) {
-      nextIndex = Math.floor(Math.random() * queue.length);
-    } else if (nextIndex >= queue.length) {
-      if (repeat === "all") {
-        nextIndex = 0;
-      } else {
-        return;
-      }
+      nextIdx = Math.floor(Math.random() * queue.length);
+    } else if (nextIdx >= queue.length) {
+      nextIdx = 0;
     }
 
-    const nextTrk = queue[nextIndex];
-    if (nextTrk) {
-      await play(nextTrk);
-    }
+    await play(queue[nextIdx]);
   },
 
   previousTrack: async () => {
-    const { queue, queueIndex, telemetry, seek, play } = get();
+    const { queue, queueIndex, play } = get();
     if (queue.length === 0) return;
 
-    if (telemetry.current_time > 3) {
-      await seek(0);
-      return;
+    let prevIdx = queueIndex - 1;
+    if (prevIdx < 0) {
+      prevIdx = queue.length - 1;
     }
 
-    let prevIndex = queueIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = queue.length - 1;
-    }
-
-    const prevTrk = queue[prevIndex];
-    if (prevTrk) {
-      await play(prevTrk);
-    }
+    await play(queue[prevIdx]);
   },
 
   setQueue: async (tracks: Track[], startIndex = 0) => {
-    set({
-      queue: tracks,
-      queueIndex: startIndex,
-    });
-    if (tracks.length > 0 && startIndex >= 0 && startIndex < tracks.length) {
+    set({ queue: tracks, queueIndex: startIndex });
+    if (tracks[startIndex]) {
       await get().play(tracks[startIndex]);
     }
   },
 
   addToQueue: (track: Track | Track[]) => {
-    set((state) => {
-      const toAdd = Array.isArray(track) ? track : [track];
-      return { queue: [...state.queue, ...toAdd] };
-    });
+    const toAdd = Array.isArray(track) ? track : [track];
+    set((state) => ({ queue: [...state.queue, ...toAdd] }));
   },
 
   removeFromQueue: (index: number) => {
     set((state) => {
-      const nextQueue = [...state.queue];
-      nextQueue.splice(index, 1);
-      let nextIndex = state.queueIndex;
+      const newQueue = [...state.queue];
+      newQueue.splice(index, 1);
+      let newIdx = state.queueIndex;
       if (index < state.queueIndex) {
-        nextIndex--;
+        newIdx--;
       } else if (index === state.queueIndex) {
-        if (nextIndex >= nextQueue.length) {
-          nextIndex = nextQueue.length - 1;
-        }
+        newIdx = Math.min(newIdx, newQueue.length - 1);
       }
-      return { queue: nextQueue, queueIndex: nextIndex };
+      return { queue: newQueue, queueIndex: newIdx };
     });
   },
 
@@ -479,38 +385,42 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   cycleRepeat: () => {
     set((state) => {
       const modes: RepeatMode[] = ["off", "all", "one"];
-      const currentIdx = modes.indexOf(state.repeat);
-      const nextIdx = (currentIdx + 1) % modes.length;
+      const nextIdx = (modes.indexOf(state.repeat) + 1) % modes.length;
       return { repeat: modes[nextIdx] };
     });
   },
 
   setBitPerfectMode: async (enabled: boolean) => {
-    await api.setBitPerfect(enabled);
+    const { selectedDevice } = get();
     set({ bitPerfectMode: enabled });
+    await api.setOutputDevice(
+      selectedDevice === "Default" ? undefined : selectedDevice,
+      enabled
+    );
   },
 
   setOutputDevice: async (deviceName: string) => {
-    await api.setOutputDevice(deviceName);
+    const { bitPerfectMode } = get();
     set({ selectedDevice: deviceName });
+    await api.setOutputDevice(
+      deviceName === "Default" ? undefined : deviceName,
+      bitPerfectMode
+    );
   },
 
   refreshAudioDevices: async () => {
     try {
-      const devices = await api.getAudioDevices();
-      set({ availableDevices: devices });
+      const devices = await api.listAudioDevices();
+      set({ availableDevices: ["Default", ...devices] });
     } catch {
-      // Ignore
+      // Fallback
     }
   },
 
   fetchLibraryTracks: async (query?: string) => {
     try {
-      const tracks = await api.searchTracks(query || "");
-      set({
-        libraryTracks: tracks,
-        librarySearchQuery: query || "",
-      });
+      const tracks = await api.getTracksFromDb(query);
+      set({ libraryTracks: tracks, librarySearchQuery: query || "" });
     } catch {
       // Ignore
     }
@@ -518,9 +428,11 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
 
   startDirectoryScan: async (path: string, force = false) => {
     try {
-      await api.scanDirectory(path, force);
-    } catch {
-      // Ignore
+      set({ scanStatus: { is_scanning: true, current: 0, total: 0, current_path: path } });
+      await api.triggerScan(path, force);
+    } catch (err: unknown) {
+      set({ scanStatus: { is_scanning: false, current: 0, total: 0 } });
+      console.error("Failed to start directory scan:", err);
     }
   },
 
@@ -528,10 +440,11 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     set((state) => ({
       explorer: { ...state.explorer, isLoading: true, error: null },
     }));
+
     try {
-      const entries = await api.readDirectory(path);
+      const entries = await api.readDirectoryLazy(path);
       set((state) => {
-        const history = [...state.explorer.history];
+        const history = state.explorer.history.slice(0, state.explorer.historyIndex + 1);
         if (history[history.length - 1] !== path) {
           history.push(path);
         }
@@ -598,98 +511,19 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         language: state.language,
         appearance: state.appearance,
         audioSettings: next,
-        playbackSettings: state.playbackSettings,
-        listeningStats: state.listeningStats,
         librarySettings: state.librarySettings,
       });
       return { audioSettings: next };
     });
   },
 
-  setPlaybackSettings: (patch: Partial<PlaybackSettingsState>) => {
-    set((state) => {
-      const next = { ...state.playbackSettings, ...patch };
-      saveStoredSettings({
-        language: state.language,
-        appearance: state.appearance,
-        audioSettings: state.audioSettings,
-        playbackSettings: next,
-        listeningStats: state.listeningStats,
-        librarySettings: state.librarySettings,
-      });
-      return { playbackSettings: next };
-    });
-  },
-
-  resetStats: () => {
-    const freshStats: ListeningStatsState = {
-      totalTracksPlayed: 0,
-      totalSecondsListened: 0,
-      totalSessions: 0,
-    };
-    set((state) => {
-      saveStoredSettings({
-        language: state.language,
-        appearance: state.appearance,
-        audioSettings: state.audioSettings,
-        playbackSettings: state.playbackSettings,
-        listeningStats: freshStats,
-        librarySettings: state.librarySettings,
-      });
-      return { listeningStats: freshStats };
-    });
-  },
-
-  resetSettings: () => {
-    set((state) => {
-      const resetLang: Language = "es";
-      const resetApp = { ...defaultAppearance };
-      const resetAud = { ...defaultAudioSettings };
-      const resetPlay = { ...defaultPlaybackSettings };
-      const resetLib = { ...defaultLibrarySettings };
-      saveStoredSettings({
-        language: resetLang,
-        appearance: resetApp,
-        audioSettings: resetAud,
-        playbackSettings: resetPlay,
-        listeningStats: state.listeningStats,
-        librarySettings: resetLib,
-      });
-      return {
-        language: resetLang,
-        appearance: resetApp,
-        audioSettings: resetAud,
-        playbackSettings: resetPlay,
-        librarySettings: resetLib,
-      };
-    });
-  },
-
-  clearCacheAndResidues: () => {
-    try {
-      localStorage.removeItem(SETTINGS_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
-    set({
-      coverArtCache: {},
-      currentCoverArt: null,
-      queue: [],
-      queueIndex: -1,
-    });
-  },
-
   setLanguage: (lang: Language) => {
-    set((state) => {
-      saveStoredSettings({
-        language: lang,
-        appearance: state.appearance,
-        audioSettings: state.audioSettings,
-        playbackSettings: state.playbackSettings,
-        listeningStats: state.listeningStats,
-        librarySettings: state.librarySettings,
-      });
-      return { language: lang };
+    set({ language: lang });
+    saveStoredSettings({
+      language: lang,
+      appearance: get().appearance,
+      audioSettings: get().audioSettings,
+      librarySettings: get().librarySettings,
     });
   },
 
@@ -700,8 +534,6 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         language: state.language,
         appearance: next,
         audioSettings: state.audioSettings,
-        playbackSettings: state.playbackSettings,
-        listeningStats: state.listeningStats,
         librarySettings: state.librarySettings,
       });
       return { appearance: next };
@@ -715,8 +547,6 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         language: state.language,
         appearance: state.appearance,
         audioSettings: state.audioSettings,
-        playbackSettings: state.playbackSettings,
-        listeningStats: state.listeningStats,
         librarySettings: next,
       });
       return { librarySettings: next };
@@ -750,12 +580,11 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   },
 
   saveWindowSize: async () => {
+    // Persist layout & appearance settings into local storage
     saveStoredSettings({
       language: get().language,
       appearance: get().appearance,
       audioSettings: get().audioSettings,
-      playbackSettings: get().playbackSettings,
-      listeningStats: get().listeningStats,
       librarySettings: get().librarySettings,
     });
   },

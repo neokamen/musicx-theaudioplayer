@@ -1,9 +1,7 @@
 export type WidgetType =
   | "folder_explorer"
   | "tracklist"
-  | "cover"
   | "inspector"
-  | "eq_bars"
   | "dac_telemetry"
   | "queue";
 
@@ -25,19 +23,9 @@ export const AVAILABLE_WIDGETS: WidgetMeta[] = [
     description: "Listado de canciones con búsqueda rápida e indexado SQLite",
   },
   {
-    type: "cover",
-    label: "Carátula del Álbum",
-    description: "Visualización de portada de alta fidelidad y fallback Hi-Fi",
-  },
-  {
     type: "inspector",
-    label: "Inspector Técnico & Códec",
-    description: "Inspección de tags de archivo, códec, bit-depth y metadatos",
-  },
-  {
-    type: "eq_bars",
-    label: "Barras de Ecualizador Gráfico",
-    description: "Visualización de 10 bandas y controles de ganancia DSP",
+    label: "Carátula & Inspector Técnico",
+    description: "Inspección de tags de archivo, códec, bit-depth y artwork",
   },
   {
     type: "dac_telemetry",

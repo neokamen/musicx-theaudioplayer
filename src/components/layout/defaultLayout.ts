@@ -4,7 +4,7 @@ export const DEFAULT_LAYOUT: LayoutNode = {
   id: "root",
   type: "split",
   direction: "horizontal",
-  sizes: [22, 48, 30],
+  sizes: [22, 50, 28],
   children: [
     {
       id: "panel-left",
@@ -20,15 +20,10 @@ export const DEFAULT_LAYOUT: LayoutNode = {
       id: "panel-right",
       type: "split",
       direction: "vertical",
-      sizes: [38, 32, 30],
+      sizes: [55, 45],
       children: [
         {
           id: "panel-right-top",
-          type: "leaf",
-          widget: "cover",
-        },
-        {
-          id: "panel-right-mid",
           type: "leaf",
           widget: "inspector",
         },
@@ -42,24 +37,14 @@ export const DEFAULT_LAYOUT: LayoutNode = {
   ],
 };
 
-const STORAGE_KEY = "musicx_layout_config_v5";
-
-function containsObsoleteWidget(node: LayoutNode): boolean {
-  if (node.type === "leaf") {
-    return (node.widget as string) === "cover_inspector";
-  }
-  if (node.type === "split" && node.children) {
-    return node.children.some(containsObsoleteWidget);
-  }
-  return false;
-}
+const STORAGE_KEY = "musicx_layout_config_v1";
 
 export function loadLayoutFromStorage(): LayoutNode {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as LayoutNode;
-      if (parsed && parsed.id && parsed.type && !containsObsoleteWidget(parsed)) {
+      if (parsed && parsed.id && parsed.type) {
         return parsed;
       }
     }
@@ -78,16 +63,6 @@ export function saveLayoutToStorage(layout: LayoutNode): void {
 }
 
 export function resetLayoutStorage(): LayoutNode {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem("musicx_layout_config_v1");
-    localStorage.removeItem("musicx_layout_config_v2");
-    localStorage.removeItem("musicx_layout_config_v3");
-  } catch {
-    // Ignore
-  }
+  localStorage.removeItem(STORAGE_KEY);
   return DEFAULT_LAYOUT;
 }
-
-export const loadStoredLayout = loadLayoutFromStorage;
-export const saveStoredLayout = saveLayoutToStorage;
