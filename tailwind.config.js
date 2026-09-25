@@ -9,15 +9,15 @@ export default {
     extend: {
       colors: {
         audiophile: {
-          base: "#08090a",      // Fondo ultra oscuro / OLED
-          surface: "#0f1115",   // Paneles y tarjetas de reproducción
-          surface2: "#181b21",  // Superficie secundaria / hover
-          border: "#242831",    // Bordes sutiles de alta fidelidad
-          muted: "#6b7280",     // Textos secundarios y metadatos tenue
-          text: "#e4e7eb",      // Texto principal
-          cyan: "#00f0ff",      // Indicador digital Hi-Res
-          amber: "#e5a93c",     // Vúmetro cálido / lámpara de vacío vintage
-          green: "#10b981",     // Estado de playback / Bit-perfect
+          base: "var(--app-bg, #08090a)",
+          surface: "var(--app-surface, #0f1115)",
+          surface2: "var(--app-surface2, #181b21)",
+          border: "var(--app-border, #242831)",
+          muted: "#8b949e",
+          text: "var(--app-text, #e4e7eb)",
+          cyan: "var(--app-accent, #06b6d4)",
+          amber: "#e5a93c",
+          green: "#10b981",
         },
       },
       fontFamily: {

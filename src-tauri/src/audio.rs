@@ -27,6 +27,7 @@ pub enum AudioCommand {
     Seek(f64),
     SetVolume(f32),
     SetOutputDevice { device_name: Option<String>, bit_perfect: bool },
+    SetDspSettings { xdss: bool, normalizer: bool, eq_gains: Vec<f32> },
 }
 
 pub struct AudioEngineHandle {
@@ -155,6 +156,9 @@ struct AudioEngineInternal {
     active_channels: u16,
     samples_rendered: Arc<AtomicU32>,
     current_pos_secs: f64,
+    xdss_enabled: bool,
+    normalizer_enabled: bool,
+    eq_gains: Vec<f32>,
 }
 
 impl AudioEngineInternal {
@@ -174,6 +178,9 @@ impl AudioEngineInternal {
             active_channels: 2,
             samples_rendered: Arc::new(AtomicU32::new(0)),
             current_pos_secs: 0.0,
+            xdss_enabled: false,
+            normalizer_enabled: false,
+            eq_gains: vec![0.0; 10],
         }
     }
 
@@ -244,6 +251,11 @@ impl AudioEngineInternal {
                 if self.is_playing.load(Ordering::Relaxed) {
                     self.setup_cpal_stream();
                 }
+            }
+            AudioCommand::SetDspSettings { xdss, normalizer, eq_gains } => {
+                self.xdss_enabled = xdss;
+                self.normalizer_enabled = normalizer;
+                self.eq_gains = eq_gains;
             }
         }
     }

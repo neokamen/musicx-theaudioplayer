@@ -1,6 +1,0 @@
-{
-  "files.hotExit": "off",
-  "files.autoSave": "afterDelay",
-  "files.autoSaveDelay": 1000,
-  "workbench.editor.enablePreview": true
-}

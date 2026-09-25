@@ -4,7 +4,7 @@ export const DEFAULT_LAYOUT: LayoutNode = {
   id: "root",
   type: "split",
   direction: "horizontal",
-  sizes: [22, 50, 28],
+  sizes: [22, 48, 30],
   children: [
     {
       id: "panel-left",
@@ -20,10 +20,15 @@ export const DEFAULT_LAYOUT: LayoutNode = {
       id: "panel-right",
       type: "split",
       direction: "vertical",
-      sizes: [55, 45],
+      sizes: [38, 32, 30],
       children: [
         {
           id: "panel-right-top",
+          type: "leaf",
+          widget: "cover",
+        },
+        {
+          id: "panel-right-mid",
           type: "leaf",
           widget: "inspector",
         },
@@ -37,32 +42,35 @@ export const DEFAULT_LAYOUT: LayoutNode = {
   ],
 };
 
-const STORAGE_KEY = "musicx_layout_config_v1";
+const STORAGE_KEY = "musicx_layout_config_v2";
 
-export function loadLayoutFromStorage(): LayoutNode {
+export function loadStoredLayout(): LayoutNode {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as LayoutNode;
-      if (parsed && parsed.id && parsed.type) {
-        return parsed;
-      }
+      return JSON.parse(raw);
     }
-  } catch (e) {
-    console.warn("No se pudo cargar el layout guardado. Usando layout por defecto:", e);
+  } catch (err) {
+    console.error("Failed to parse saved layout from localStorage:", err);
   }
   return DEFAULT_LAYOUT;
 }
 
-export function saveLayoutToStorage(layout: LayoutNode): void {
+export function saveStoredLayout(layout: LayoutNode): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
-  } catch (e) {
-    console.error("Error al guardar layout en localStorage:", e);
+  } catch (err) {
+    console.error("Failed to save layout into localStorage:", err);
   }
 }
 
-export function resetLayoutStorage(): LayoutNode {
-  localStorage.removeItem(STORAGE_KEY);
-  return DEFAULT_LAYOUT;
+export function resetLayoutStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
 }
+
+export const loadLayoutFromStorage = loadStoredLayout;
+export const saveLayoutToStorage = saveStoredLayout;

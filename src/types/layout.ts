@@ -1,8 +1,10 @@
 export type WidgetType =
   | "folder_explorer"
   | "tracklist"
+  | "cover"
   | "inspector"
   | "dac_telemetry"
+  | "eq_bars"
   | "queue";
 
 export interface WidgetMeta {
@@ -19,18 +21,28 @@ export const AVAILABLE_WIDGETS: WidgetMeta[] = [
   },
   {
     type: "tracklist",
-    label: "Lista de Biblioteca / Canciones",
+    label: "Lista de Canciones / Biblioteca",
     description: "Listado de canciones con búsqueda rápida e indexado SQLite",
   },
   {
+    type: "cover",
+    label: "Carátula del Álbum",
+    description: "Visualización de portada y arte del disco a alta resolución",
+  },
+  {
     type: "inspector",
-    label: "Carátula & Inspector Técnico",
-    description: "Inspección de tags de archivo, códec, bit-depth y artwork",
+    label: "Inspector Técnico & Metadatos",
+    description: "Inspección de tags de archivo, códec, bit-depth y parámetros PCM",
   },
   {
     type: "dac_telemetry",
     label: "Telemetría Hi-Fi & DAC",
-    description: "Estado ALSA/PipeWire, stream bit-perfect y medidor dinámico",
+    description: "Estado ALSA/PipeWire, stream bit-perfect y espectro a tiempo real",
+  },
+  {
+    type: "eq_bars",
+    label: "Visualizador / Barras EQ",
+    description: "Barras dinámicas del ecualizador y respuesta en frecuencia",
   },
   {
     type: "queue",

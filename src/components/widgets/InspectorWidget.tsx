@@ -1,9 +1,9 @@
 import React from "react";
 import { useMusicStore } from "../../store/index.ts";
-import { Disc3, FileAudio, Info, Cpu, Layers } from "lucide-react";
+import { FileAudio, Info, Cpu, Layers, HardDrive } from "lucide-react";
 
 export const InspectorWidget: React.FC = () => {
-  const { currentTrack, telemetry, currentCoverArt } = useMusicStore();
+  const { currentTrack, telemetry } = useMusicStore();
 
   const title = telemetry.track_title || currentTrack?.title || "Ninguna pista seleccionada";
   const artist = telemetry.track_artist || currentTrack?.artist || "---";
@@ -12,57 +12,31 @@ export const InspectorWidget: React.FC = () => {
   const sampleRate = telemetry.sample_rate || currentTrack?.sample_rate || 44100;
   const bitDepth = telemetry.bits_per_sample || currentTrack?.bit_depth || 16;
   const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 1411;
-  const channels = telemetry.channels === 1 ? "Mono" : telemetry.channels === 2 ? "Stereo (2.0)" : `${telemetry.channels} ch`;
+  const channels = telemetry.channels === 1 ? "Mono (1.0)" : telemetry.channels === 2 ? "Stereo (2.0)" : `${telemetry.channels} ch`;
+  const fileSizeMb = currentTrack?.file_size ? (currentTrack.file_size / (1024 * 1024)).toFixed(2) : "---";
 
   return (
     <div className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans overflow-hidden text-xs">
       <div className="p-2 border-b border-audiophile-border bg-audiophile-surface2 flex items-center justify-between">
         <span className="font-mono text-[10px] uppercase tracking-wider text-audiophile-muted flex items-center gap-1.5">
           <Info size={12} className="text-audiophile-cyan" />
-          Inspector & Carátula
+          Inspector Técnico & Metadata
         </span>
         <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-audiophile-border text-audiophile-text">
-          METADATA
+          SPECIFICATIONS
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center gap-4">
-        {/* Carátula de la Canción con Fallback Hi-Fi */}
-        <div className="relative w-44 h-44 rounded-lg bg-audiophile-base border border-audiophile-border shadow-xl flex items-center justify-center group overflow-hidden">
-          {currentCoverArt ? (
-            <img
-              src={currentCoverArt}
-              alt={album}
-              className="w-full h-full object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform duration-500"
-            />
-          ) : (
-            <>
-              <div className="absolute inset-0 bg-gradient-to-tr from-audiophile-surface to-transparent opacity-60" />
-              <Disc3
-                size={72}
-                className={`text-audiophile-muted/40 transition-transform duration-1000 ${
-                  telemetry.state === "Playing" ? "animate-spin text-audiophile-cyan/40" : ""
-                }`}
-                style={{ animationDuration: "6s" }}
-              />
-            </>
-          )}
-
-          <div className="absolute bottom-2 left-2 right-2 text-center pointer-events-none">
-            <span className="font-mono text-[9px] uppercase tracking-wider text-white bg-slate-950/80 px-2 py-0.5 rounded backdrop-blur border border-slate-700/50 block truncate shadow-md">
-              {album}
-            </span>
-          </div>
-        </div>
-
-        {/* Título & Artista */}
-        <div className="text-center w-full px-2">
-          <h3 className="font-bold text-sm text-white truncate" title={title}>
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+        {/* Track Title & Artist */}
+        <div className="bg-audiophile-base border border-audiophile-border rounded-lg p-2.5">
+          <div className="text-[10px] font-mono text-audiophile-muted uppercase">Pista Activa</div>
+          <div className="font-bold text-xs text-white truncate mt-0.5" title={title}>
             {title}
-          </h3>
-          <p className="text-audiophile-muted text-xs truncate mt-0.5" title={artist}>
-            {artist}
-          </p>
+          </div>
+          <div className="text-[11px] text-audiophile-cyan truncate mt-0.5" title={`${artist} — ${album}`}>
+            {artist} <span className="text-audiophile-muted">&bull;</span> {album}
+          </div>
         </div>
 
         {/* Grid de Especificaciones Técnicas */}
@@ -76,7 +50,7 @@ export const InspectorWidget: React.FC = () => {
 
           <div className="bg-audiophile-surface2 border border-audiophile-border/70 rounded p-2 flex flex-col justify-between">
             <span className="text-audiophile-muted uppercase text-[9px] flex items-center gap-1">
-              <Cpu size={10} className="text-audiophile-cyan" /> Bitrate Promedio
+              <Cpu size={10} className="text-audiophile-cyan" /> Bitrate Actual
             </span>
             <span className="font-bold text-audiophile-cyan mt-1">
               {bitrate > 0 ? `${bitrate} kbps` : "1411 kbps"}
@@ -85,7 +59,7 @@ export const InspectorWidget: React.FC = () => {
 
           <div className="bg-audiophile-surface2 border border-audiophile-border/70 rounded p-2 flex flex-col justify-between">
             <span className="text-audiophile-muted uppercase text-[9px] flex items-center gap-1">
-              <Layers size={10} className="text-audiophile-green" /> Resolución PCM
+              <Layers size={10} className="text-audiophile-green" /> Frecuencia / Bits
             </span>
             <span className="font-bold text-audiophile-text mt-1">
               {sampleRate > 0 ? `${sampleRate / 1000} kHz / ${bitDepth}b` : "44.1 kHz / 16b"}
@@ -93,15 +67,20 @@ export const InspectorWidget: React.FC = () => {
           </div>
 
           <div className="bg-audiophile-surface2 border border-audiophile-border/70 rounded p-2 flex flex-col justify-between">
-            <span className="text-audiophile-muted uppercase text-[9px]">Config Canales</span>
+            <span className="text-audiophile-muted uppercase text-[9px]">Configuración Canales</span>
             <span className="font-bold text-audiophile-text mt-1">{channels}</span>
           </div>
         </div>
 
-        {/* Ubicación del Archivo */}
+        {/* Ubicación del Archivo y Tamaño */}
         {telemetry.filepath && (
           <div className="w-full bg-audiophile-base border border-audiophile-border rounded p-2 font-mono text-[9px] text-audiophile-muted break-all">
-            <span className="text-audiophile-cyan block mb-0.5">// Archivo fuente:</span>
+            <div className="flex items-center justify-between text-audiophile-cyan mb-1">
+              <span className="flex items-center gap-1">
+                <HardDrive size={10} /> Archivo fuente:
+              </span>
+              <span>{fileSizeMb !== "---" ? `${fileSizeMb} MB` : ""}</span>
+            </div>
             {telemetry.filepath}
           </div>
         )}

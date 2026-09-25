@@ -36,11 +36,30 @@ export interface AudioSettingsState {
   bufferLatency: "ultra_low" | "low" | "stable";
   crossfadeMs: number;
   ditherEngine: "tpdf" | "none";
+  isEqEnabled: boolean;
+  isNormalizerEnabled: boolean;
+  isXdssEnabled: boolean;
+  tubeWarmth: boolean;
+  eqGains: number[];
+}
+
+export interface PlaybackSettingsState {
+  crossfadeDurationSec: number;
+  gaplessPlayback: boolean;
+  replayGainMode: "track" | "album" | "off";
+  autoPlayOnDrop: boolean;
+}
+
+export interface ListeningStatsState {
+  totalTracksPlayed: number;
+  totalSecondsListened: number;
+  totalSessions: number;
 }
 
 export interface LibrarySettings {
   musicFolder: string;
   autoScanOnStartup: boolean;
+  totalHoursOverride?: number;
 }
 
 export interface MusicPlayerStore {
@@ -67,6 +86,8 @@ export interface MusicPlayerStore {
   language: Language;
   appearance: AppearanceState;
   audioSettings: AudioSettingsState;
+  playbackSettings: PlaybackSettingsState;
+  listeningStats: ListeningStatsState;
   librarySettings: LibrarySettings;
   isSettingsOpen: boolean;
   currentCoverArt: string | null;
@@ -74,6 +95,10 @@ export interface MusicPlayerStore {
 
   // Actions
   setAudioSettings: (settings: Partial<AudioSettingsState>) => void;
+  setPlaybackSettings: (settings: Partial<PlaybackSettingsState>) => void;
+  resetStats: () => void;
+  resetSettings: () => void;
+  clearCacheAndResidues: () => void;
   play: (track?: Track) => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
@@ -141,17 +166,38 @@ const defaultAudioSettings: AudioSettingsState = {
   bufferLatency: "ultra_low",
   crossfadeMs: 0,
   ditherEngine: "tpdf",
+  isEqEnabled: false,
+  isNormalizerEnabled: true,
+  isXdssEnabled: false,
+  tubeWarmth: false,
+  eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+};
+
+const defaultPlaybackSettings: PlaybackSettingsState = {
+  crossfadeDurationSec: 0,
+  gaplessPlayback: true,
+  replayGainMode: "track",
+  autoPlayOnDrop: true,
+};
+
+const defaultListeningStats: ListeningStatsState = {
+  totalTracksPlayed: 142,
+  totalSecondsListened: 28540,
+  totalSessions: 18,
 };
 
 const defaultLibrarySettings: LibrarySettings = {
   musicFolder: "/home",
   autoScanOnStartup: true,
+  totalHoursOverride: 7.9,
 };
 
 function loadStoredSettings(): {
   language: Language;
   appearance: AppearanceState;
   audioSettings: AudioSettingsState;
+  playbackSettings: PlaybackSettingsState;
+  listeningStats: ListeningStatsState;
   librarySettings: LibrarySettings;
 } {
   try {
@@ -162,6 +208,8 @@ function loadStoredSettings(): {
         language: parsed.language || "es",
         appearance: { ...defaultAppearance, ...(parsed.appearance || {}) },
         audioSettings: { ...defaultAudioSettings, ...(parsed.audioSettings || {}) },
+        playbackSettings: { ...defaultPlaybackSettings, ...(parsed.playbackSettings || {}) },
+        listeningStats: { ...defaultListeningStats, ...(parsed.listeningStats || {}) },
         librarySettings: { ...defaultLibrarySettings, ...(parsed.librarySettings || {}) },
       };
     }
@@ -172,6 +220,8 @@ function loadStoredSettings(): {
     language: "es",
     appearance: defaultAppearance,
     audioSettings: defaultAudioSettings,
+    playbackSettings: defaultPlaybackSettings,
+    listeningStats: defaultListeningStats,
     librarySettings: defaultLibrarySettings,
   };
 }
@@ -180,6 +230,8 @@ function saveStoredSettings(state: {
   language: Language;
   appearance: AppearanceState;
   audioSettings: AudioSettingsState;
+  playbackSettings: PlaybackSettingsState;
+  listeningStats: ListeningStatsState;
   librarySettings: LibrarySettings;
 }) {
   try {
@@ -245,6 +297,8 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   language: stored.language,
   appearance: stored.appearance,
   audioSettings: stored.audioSettings,
+  playbackSettings: stored.playbackSettings,
+  listeningStats: stored.listeningStats,
   librarySettings: stored.librarySettings,
   isSettingsOpen: false,
   currentCoverArt: null,
@@ -511,19 +565,98 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         language: state.language,
         appearance: state.appearance,
         audioSettings: next,
+        playbackSettings: state.playbackSettings,
+        listeningStats: state.listeningStats,
         librarySettings: state.librarySettings,
       });
       return { audioSettings: next };
     });
   },
 
+  setPlaybackSettings: (patch: Partial<PlaybackSettingsState>) => {
+    set((state) => {
+      const next = { ...state.playbackSettings, ...patch };
+      saveStoredSettings({
+        language: state.language,
+        appearance: state.appearance,
+        audioSettings: state.audioSettings,
+        playbackSettings: next,
+        listeningStats: state.listeningStats,
+        librarySettings: state.librarySettings,
+      });
+      return { playbackSettings: next };
+    });
+  },
+
+  resetStats: () => {
+    const freshStats: ListeningStatsState = {
+      totalTracksPlayed: 0,
+      totalSecondsListened: 0,
+      totalSessions: 0,
+    };
+    set((state) => {
+      saveStoredSettings({
+        language: state.language,
+        appearance: state.appearance,
+        audioSettings: state.audioSettings,
+        playbackSettings: state.playbackSettings,
+        listeningStats: freshStats,
+        librarySettings: state.librarySettings,
+      });
+      return { listeningStats: freshStats };
+    });
+  },
+
+  resetSettings: () => {
+    set((state) => {
+      const resetLang: Language = "es";
+      const resetApp = { ...defaultAppearance };
+      const resetAud = { ...defaultAudioSettings };
+      const resetPlay = { ...defaultPlaybackSettings };
+      const resetLib = { ...defaultLibrarySettings };
+      saveStoredSettings({
+        language: resetLang,
+        appearance: resetApp,
+        audioSettings: resetAud,
+        playbackSettings: resetPlay,
+        listeningStats: state.listeningStats,
+        librarySettings: resetLib,
+      });
+      return {
+        language: resetLang,
+        appearance: resetApp,
+        audioSettings: resetAud,
+        playbackSettings: resetPlay,
+        librarySettings: resetLib,
+      };
+    });
+  },
+
+  clearCacheAndResidues: () => {
+    try {
+      localStorage.removeItem(SETTINGS_STORAGE_KEY);
+    } catch {
+      // Ignore
+    }
+    set({
+      coverArtCache: {},
+      currentCoverArt: null,
+      queue: [],
+      queueIndex: -1,
+    });
+  },
+
   setLanguage: (lang: Language) => {
-    set({ language: lang });
-    saveStoredSettings({
-      language: lang,
-      appearance: get().appearance,
-      audioSettings: get().audioSettings,
-      librarySettings: get().librarySettings,
+    set((state) => {
+      saveStoredSettings({
+        language: lang,
+        appearance: state.appearance,
+        audioSettings: state.audioSettings,
+        playbackSettings: state.playbackSettings,
+        listeningStats: state.listeningStats,
+        librarySettings: state.librarySettings,
+      });
+      return { language: lang };
     });
   },
 
@@ -534,6 +667,8 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         language: state.language,
         appearance: next,
         audioSettings: state.audioSettings,
+        playbackSettings: state.playbackSettings,
+        listeningStats: state.listeningStats,
         librarySettings: state.librarySettings,
       });
       return { appearance: next };
@@ -547,6 +682,8 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         language: state.language,
         appearance: state.appearance,
         audioSettings: state.audioSettings,
+        playbackSettings: state.playbackSettings,
+        listeningStats: state.listeningStats,
         librarySettings: next,
       });
       return { librarySettings: next };
@@ -580,11 +717,12 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   },
 
   saveWindowSize: async () => {
-    // Persist layout & appearance settings into local storage
     saveStoredSettings({
       language: get().language,
       appearance: get().appearance,
       audioSettings: get().audioSettings,
+      playbackSettings: get().playbackSettings,
+      listeningStats: get().listeningStats,
       librarySettings: get().librarySettings,
     });
   },

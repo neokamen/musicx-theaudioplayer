@@ -10,20 +10,20 @@ use commands::AppState;
 use db::DatabaseManager;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let audio_engine = Arc::new(AudioEngineHandle::new());
-
-    // Initialize MPRIS D-Bus background listener
-    mpris::start_mpris_service(Arc::clone(&audio_engine));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup({
             let audio_engine = Arc::clone(&audio_engine);
             move |app| {
+                // Initialize MPRIS D-Bus player on GTK main thread
+                mpris::start_mpris_service(Arc::clone(&audio_engine));
+
                 // Initialize SQLite database in user's app data directory or fallback to current dir
                 let app_data_dir = app
                     .path()
@@ -37,9 +37,23 @@ pub fn run() {
                 let db = Arc::new(db);
 
                 app.manage(AppState {
-                    audio: audio_engine,
+                    audio: Arc::clone(&audio_engine),
                     db,
                 });
+
+                // Spawn real-time audio telemetry background broadcaster (~33 FPS)
+                let app_handle = app.handle().clone();
+                let engine_for_telemetry = Arc::clone(&audio_engine);
+                std::thread::Builder::new()
+                    .name("musicx-telemetry-broadcaster".to_string())
+                    .spawn(move || {
+                        loop {
+                            let tele = engine_for_telemetry.get_telemetry();
+                            let _ = app_handle.emit("audio-telemetry", &tele);
+                            std::thread::sleep(std::time::Duration::from_millis(30));
+                        }
+                    })
+                    .expect("Failed to spawn telemetry broadcaster thread");
 
                 Ok(())
             }
@@ -59,6 +73,7 @@ pub fn run() {
             commands::scan_directory,
             commands::read_directory_lazy,
             commands::get_track_cover_art,
+            commands::set_dsp_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running musicx audio player application");
