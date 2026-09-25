@@ -19,7 +19,7 @@ impl DatabaseManager {
         let conn = Connection::open(db_path)?;
 
         // WAL mode for high concurrency and fast write throughput
-        conn.pragma_update_and_check(None, "journal_mode", "WAL", |_| Ok(()))?;
+        let _wal_mode: String = conn.query_row("PRAGMA journal_mode = WAL;", [], |r| r.get(0))?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "temp_store", "MEMORY")?;
         conn.pragma_update(None, "cache_size", -64000)?; // 64MB cache
@@ -342,4 +342,21 @@ pub fn scan_directory_incremental(
             },
         );
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_database_manager_initialization() {
+        let temp_dir = std::env::temp_dir();
+        let db_file = temp_dir.join("test_musicx_wal_init.db");
+        let _ = std::fs::remove_file(&db_file);
+
+        let mgr = DatabaseManager::new(&db_file);
+        assert!(mgr.is_ok(), "DatabaseManager::new failed: {:?}", mgr.err());
+
+        let _ = std::fs::remove_file(&db_file);
+    }
 }
