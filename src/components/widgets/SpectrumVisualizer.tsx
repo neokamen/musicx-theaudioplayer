@@ -31,18 +31,27 @@ export interface SpectrumVisualizerProps {
 }
 
 export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
-  height = 130,
+  height,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const telemetry = useAppStore((s) => s.telemetry);
   const isPlayingStore = useAppStore((s) => s.isPlaying);
   const storeVolume = useAppStore((s) => s.volume);
   const appearance = useAppStore((s) => s.appearance);
+  const setAppearance = useAppStore((s) => s.setAppearance);
 
   const isPlaying = (isPlayingStore || telemetry.state === 'Playing') && telemetry.state !== 'Stopped' && telemetry.state !== 'Paused';
   const volume = telemetry.volume ?? storeVolume ?? 1;
 
-  // Real-time canvas render loop driven strictly by PCM audio telemetry
+  // Double-click to cycle spectrum visualizer styles
+  const handleDoubleClick = () => {
+    const currentStyle = appearance.spectrumStyle || 'bars';
+    const currentIndex = SPECTRUM_STYLES.findIndex((s) => s.id === currentStyle);
+    const nextIndex = (currentIndex + 1) % SPECTRUM_STYLES.length;
+    setAppearance({ spectrumStyle: SPECTRUM_STYLES[nextIndex].id });
+  };
+
+  // Ultra-fluid 60 FPS continuous physics rendering loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -51,19 +60,16 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
     let animId: number;
     let lastTime = performance.now();
-    const fps = appearance.spectrumFps || 60;
-    const interval = 1000 / fps;
 
-    const numBands = 16;
+    const numBands = 24;
     const currentBands = new Float32Array(numBands);
     const peaks = new Float32Array(numBands);
     const peakVelocity = new Float32Array(numBands);
 
     const render = (now: number) => {
       animId = requestAnimationFrame(render);
-      const delta = now - lastTime;
-      if (delta < interval) return;
-      lastTime = now - (delta % interval);
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
 
       const rect = canvas.getBoundingClientRect();
       if (canvas.width !== rect.width || canvas.height !== rect.height) {
@@ -81,22 +87,25 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
       const timeSec = now / 1000;
 
       // Extract real audio spectrum values from Rust telemetry
-      const targetBands = telemetry.spectrum && telemetry.spectrum.length >= numBands
+      const targetBands = telemetry.spectrum && telemetry.spectrum.length > 0
         ? telemetry.spectrum
         : [];
 
       for (let i = 0; i < numBands; i++) {
-        // Strictly 0 amplitude when stopped/paused/muted
         if (!isPlaying || volume === 0) {
-          currentBands[i] = 0;
-        } else if (targetBands.length > i) {
-          // Smooth interpolation towards target PCM band
-          const rawVal = Math.max(0, Math.min(1, targetBands[i] * volume));
-          currentBands[i] += (rawVal - currentBands[i]) * 0.4;
+          // Smooth decay when paused/stopped
+          currentBands[i] = Math.max(0, currentBands[i] - dt * 2.5);
+        } else if (targetBands.length > 0) {
+          const specIdx = Math.floor((i / numBands) * targetBands.length);
+          const rawVal = Math.max(0, Math.min(1.0, (targetBands[specIdx] || 0) * (volume > 1 ? 1 : volume) * 1.35));
+          // Exponential decay/attack interpolation (ultra smooth curve style)
+          const factor = 1 - Math.exp(-dt * 22);
+          currentBands[i] += (rawVal - currentBands[i]) * factor;
         } else {
-          // Fallback PCM wave calculation strictly during active playback
-          const synth = (Math.sin(timeSec * 8 + i * 0.5) * 0.5 + 0.5) * volume * 0.7;
-          currentBands[i] += (synth - currentBands[i]) * 0.3;
+          // Dynamic organic wave synthesis during active playback
+          const synth = (Math.sin(timeSec * 5 + i * 0.4) * 0.4 + 0.5) * Math.min(1, volume) * 0.85;
+          const factor = 1 - Math.exp(-dt * 18);
+          currentBands[i] += (synth - currentBands[i]) * factor;
         }
 
         // Gravity physics for peaks
@@ -104,8 +113,8 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
           peaks[i] = currentBands[i];
           peakVelocity[i] = 0;
         } else {
-          peakVelocity[i] += 0.004;
-          peaks[i] = Math.max(0, peaks[i] - peakVelocity[i]);
+          peakVelocity[i] += dt * 1.2;
+          peaks[i] = Math.max(0, peaks[i] - peakVelocity[i] * dt * 60);
         }
       }
 
@@ -113,27 +122,28 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
       switch (style) {
         case 'bars': {
-          const barWidth = (w / numBands) * 0.75;
-          const gap = (w / numBands) * 0.25;
+          const barWidth = (w / numBands) * 0.8;
+          const gap = (w / numBands) * 0.2;
           for (let i = 0; i < numBands; i++) {
-            const barHeight = currentBands[i] * (h - 12);
+            // Bars reach up to 98% of total height for full impact
+            const barHeight = Math.max(2, currentBands[i] * (h - 4));
             const x = i * (barWidth + gap) + gap / 2;
             const y = h - barHeight;
 
-            if (barHeight > 1) {
+            if (barHeight > 2) {
               const grad = ctx.createLinearGradient(0, h, 0, 0);
-              grad.addColorStop(0, `${accent}33`);
-              grad.addColorStop(0.7, accent);
+              grad.addColorStop(0, `${accent}40`);
+              grad.addColorStop(0.65, accent);
               grad.addColorStop(1, '#ffffff');
 
               ctx.fillStyle = grad;
               ctx.shadowColor = accent;
-              ctx.shadowBlur = appearance.neonGlow ? (appearance.neonIntensity / 100) * 12 : 0;
+              ctx.shadowBlur = appearance.neonGlow ? (appearance.neonIntensity / 100) * 10 : 0;
               ctx.fillRect(x, y, barWidth, barHeight);
             }
 
             if (peaks[i] > 0.02) {
-              const peakY = h - peaks[i] * (h - 12);
+              const peakY = Math.max(2, h - peaks[i] * (h - 4));
               ctx.fillStyle = '#ffffff';
               ctx.fillRect(x, peakY - 2, barWidth, 2);
             }
@@ -371,8 +381,10 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
   return (
     <div
-      className="w-full relative rounded-lg overflow-hidden border border-slate-800/80 bg-slate-950/90 shadow-inner"
-      style={{ height }}
+      onDoubleClick={handleDoubleClick}
+      className="w-full h-full relative rounded-lg overflow-hidden border border-slate-800/80 bg-slate-950/90 shadow-inner cursor-pointer"
+      style={height ? { height } : undefined}
+      title="Doble clic para cambiar estilo de espectro"
     >
       <canvas ref={canvasRef} className="w-full h-full block" />
     </div>

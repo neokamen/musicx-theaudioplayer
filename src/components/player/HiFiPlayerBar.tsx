@@ -13,7 +13,6 @@ import {
   Speaker,
   Sliders,
   Sparkles,
-  ChevronUp,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -50,7 +49,6 @@ export const HiFiPlayerBar: React.FC = () => {
 
   const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false);
   const [isEqPopupOpen, setIsEqPopupOpen] = useState(false);
-  const [isNormPopupOpen, setIsNormPopupOpen] = useState(false);
 
   const miniCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -81,6 +79,7 @@ export const HiFiPlayerBar: React.FC = () => {
   const isEqActive = audioSettings?.isEqEnabled ?? false;
   const isNormActive = audioSettings?.isNormalizerEnabled ?? false;
   const isXdssActive = audioSettings?.isXdssEnabled ?? false;
+  const isXtsProActive = audioSettings?.isXtsProEnabled ?? false;
   const eqGains = audioSettings?.eqGains || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   const maxVolumeLimit = audioSettings?.allowExtraVolumeBoost ? 1.25 : 1.0;
@@ -267,28 +266,18 @@ export const HiFiPlayerBar: React.FC = () => {
 
       {/* 3. DSP Controls, Stereo/Mono Indicator, Audio Device & Volume Slider */}
       <div className="flex items-center justify-end gap-3 w-1/3 min-w-[320px]">
-        {/* Fine STEREO / MONO Indicator */}
-        <div className="flex items-center gap-1 font-mono text-[10px] tracking-wider px-2 py-1 rounded bg-slate-900 border border-slate-800">
-          <span
-            className={`transition-colors font-bold ${
-              !isMono ? "text-cyan-400" : "text-slate-600"
-            }`}
-            style={{ color: !isMono ? appearance.accentColor : undefined }}
-          >
-            STEREO
-          </span>
-          <span className="text-slate-700">|</span>
-          <span
-            className={`transition-colors font-bold ${
-              isMono ? "text-cyan-400" : "text-slate-600"
-            }`}
-            style={{ color: isMono ? appearance.accentColor : undefined }}
-          >
-            MONO
-          </span>
+        {/* Fine STEREO / MONO Indicator (Only displays the active mode) */}
+        <div
+          className="font-mono text-[10px] font-bold tracking-wider px-2 py-1 rounded bg-slate-900 border border-slate-800"
+          style={{
+            color: appearance.accentColor || "#06b6d4",
+            boxShadow: appearance.neonGlow ? `0 0 10px ${appearance.accentColor}22` : undefined,
+          }}
+        >
+          {isMono ? "MONO" : "STEREO"}
         </div>
 
-        {/* EQ Button with '+' popup */}
+        {/* EQ Button with '+' popup (Audio EQ Clone with soundix presets, XDSS Plus, XTS Pro and integrated normalizer) */}
         <div className="relative">
           <div className="flex items-center rounded-lg bg-slate-900 border border-slate-800 overflow-hidden">
             <button
@@ -309,33 +298,80 @@ export const HiFiPlayerBar: React.FC = () => {
             <button
               onClick={() => {
                 setIsEqPopupOpen(!isEqPopupOpen);
-                setIsNormPopupOpen(false);
                 setIsDeviceMenuOpen(false);
               }}
               className="px-1.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 border-l border-slate-800 text-xs font-bold"
-              title="Abrir ecualizador emergente"
+              title="Abrir ventana emergente Audio EQ"
             >
               +
             </button>
           </div>
 
-          {/* EQ Popup Panel */}
+          {/* Audio EQ Popup Panel (Clon Completo de Soundix Audio EQ) */}
           {isEqPopupOpen && (
-            <div className="absolute bottom-12 right-0 w-80 p-3 rounded-xl bg-slate-950 border border-slate-700 shadow-2xl z-50 animate-fadeIn font-mono">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs">
-                <span className="font-bold text-slate-200 flex items-center gap-1.5">
+            <div className="absolute bottom-12 right-0 w-88 p-3.5 rounded-xl bg-slate-950 border border-slate-700 shadow-2xl z-50 animate-fadeIn font-mono text-xs">
+              {/* Header: Audio EQ y selector de presets a la derecha */}
+              <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-800">
+                <div className="flex items-center gap-2">
                   <Sliders size={13} style={{ color: appearance.accentColor }} />
-                  Ecualizador Hi-Fi (10 Bandas)
-                </span>
-                <button
-                  onClick={() => setIsEqPopupOpen(false)}
-                  className="text-slate-400 hover:text-white text-xs"
-                >
-                  ✕
-                </button>
+                  <span className="font-bold text-slate-100 uppercase tracking-wide">
+                    Audio EQ
+                  </span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
+                      isEqActive
+                        ? "border-cyan-500 bg-cyan-950/60 text-cyan-300"
+                        : "border-slate-800 bg-slate-900 text-slate-500"
+                    }`}
+                  >
+                    {isEqActive ? "ON" : "BYPASS"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Selector de Presets de Soundix */}
+                  <select
+                    onChange={(e) => {
+                      const presets: Record<string, number[]> = {
+                        flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        rock: [4, 3, 2, 0, 0, 0, 1, 2, 3, 3],
+                        bass: [5, 4, 3, 1, 0, 0, 0, 0, 1, 1],
+                        pop: [-1, 1, 3, 4, 4, 3, 1, -1, -1, -1],
+                        jazz: [3, 2, 1, 2, -1, -1, 0, 1, 2, 3],
+                        vocal: [-2, -1, 0, 3, 4, 4, 3, 1, 0, -1],
+                        electronic: [4, 3.5, 1, 0, -1, 2, 1, 3, 4, 4],
+                        audiophile: [1, 0.5, 0, 0, 0, 0, 0, 0.5, 1, 1.5],
+                      };
+                      const selected = presets[e.target.value];
+                      if (selected) {
+                        setAudioSettings({ eqGains: selected, isEqEnabled: true });
+                      }
+                    }}
+                    defaultValue=""
+                    className="bg-slate-900 border border-slate-700 text-cyan-300 rounded px-1.5 py-0.5 text-[10px] focus:outline-none"
+                  >
+                    <option value="" disabled>Presets Soundix</option>
+                    <option value="flat">Flat (0 dB)</option>
+                    <option value="rock">Rock</option>
+                    <option value="bass">Bass Boost</option>
+                    <option value="pop">Pop</option>
+                    <option value="jazz">Jazz</option>
+                    <option value="vocal">Vocal Presence</option>
+                    <option value="electronic">Electronic / Club</option>
+                    <option value="audiophile">Audiophile Master</option>
+                  </select>
+
+                  <button
+                    onClick={() => setIsEqPopupOpen(false)}
+                    className="text-slate-400 hover:text-white text-xs px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
-              <div className="flex justify-between items-center gap-1 h-32 py-1">
+              {/* 10 Bandas de EQ */}
+              <div className="flex justify-between items-center gap-1 h-28 py-1">
                 {freqs.map((freq, idx) => {
                   const gain = eqGains[idx] || 0;
                   return (
@@ -354,7 +390,7 @@ export const HiFiPlayerBar: React.FC = () => {
                           next[idx] = parseFloat(e.target.value);
                           setAudioSettings({ eqGains: next, isEqEnabled: true });
                         }}
-                        className="h-20 w-1.5 appearance-none bg-slate-800 rounded cursor-pointer"
+                        className="h-16 w-1.5 appearance-none bg-slate-800 rounded cursor-pointer"
                         style={{
                           writingMode: "vertical-lr",
                           direction: "rtl",
@@ -367,118 +403,85 @@ export const HiFiPlayerBar: React.FC = () => {
                 })}
               </div>
 
-              <div className="pt-2 mt-2 border-t border-slate-800 flex justify-between items-center text-[10px] gap-2">
-                <button
-                  onClick={() => setAudioSettings({ isXdssEnabled: !isXdssActive })}
-                  className={`px-2 py-0.5 rounded font-bold border transition ${
-                    isXdssActive
-                      ? "border-amber-500 bg-amber-950/60 text-amber-300"
-                      : "border-slate-800 text-slate-500 hover:text-slate-300"
-                  }`}
-                  title="Realce dinámico de graves y armónicos XDSS"
-                >
-                  ⚡ XDSS Dynamic
-                </button>
-
+              {/* Motores DSP: XDSS Plus & XTS Pro */}
+              <div className="pt-2 mt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => setAudioSettings({ eqGains: [4, 3, 2, 0, 0, 0, 1, 2, 3, 3] })}
-                    className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
-                    title="Realce de graves y agudos"
+                    onClick={() => setAudioSettings({ isXdssEnabled: !isXdssActive, isXtsProEnabled: false })}
+                    className={`px-2 py-0.5 rounded font-bold border transition ${
+                      isXdssActive
+                        ? "border-amber-500 bg-amber-950/60 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                        : "border-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                    title="LG XDSS Plus: Realce dinámico extremo de graves y agudos"
                   >
-                    Rock
+                    ⚡ XDSS Plus
                   </button>
                   <button
-                    onClick={() => setAudioSettings({ eqGains: [5, 4, 3, 1, 0, 0, 0, 0, 1, 1] })}
-                    className="text-slate-400 hover:text-cyan-300 transition text-[9px]"
-                    title="Realce de graves profundos"
+                    onClick={() => setAudioSettings({ isXtsProEnabled: !isXtsProActive, isXdssEnabled: false })}
+                    className={`px-2 py-0.5 rounded font-bold border transition ${
+                      isXtsProActive
+                        ? "border-cyan-400 bg-cyan-950/60 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]"
+                        : "border-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                    title="LG XTS Pro: Excelente sonido puro, balance espectral y anti-distorsión"
                   >
-                    Bass
-                  </button>
-                  <button
-                    onClick={() => setAudioSettings({ eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] })}
-                    className="text-slate-400 hover:text-white underline text-[9px]"
-                  >
-                    Reset 0dB
+                    ✨ XTS Pro
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* NORM Button with '+' popup */}
-        <div className="relative">
-          <div className="flex items-center rounded-lg bg-slate-900 border border-slate-800 overflow-hidden">
-            <button
-              onClick={() => setAudioSettings({ isNormalizerEnabled: !isNormActive })}
-              className={`px-2 py-1 font-mono text-[10px] font-bold transition ${
-                isNormActive
-                  ? "bg-emerald-950/60 text-emerald-300"
-                  : "text-slate-400 hover:text-white"
-              }`}
-              title="Activar / Desactivar Normalizador Soundix"
-            >
-              NORM
-            </button>
-            <button
-              onClick={() => {
-                setIsNormPopupOpen(!isNormPopupOpen);
-                setIsEqPopupOpen(false);
-                setIsDeviceMenuOpen(false);
-              }}
-              className="px-1.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 border-l border-slate-800 text-xs font-bold"
-              title="Ajustes de normalización"
-            >
-              +
-            </button>
-          </div>
-
-          {/* Normalizer Popup */}
-          {isNormPopupOpen && (
-            <div className="absolute bottom-12 right-0 w-64 p-3 rounded-xl bg-slate-950 border border-slate-700 shadow-2xl z-50 animate-fadeIn font-mono">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs">
-                <span className="font-bold text-emerald-300 flex items-center gap-1.5">
-                  <Sparkles size={13} />
-                  Soundix Normalizer
-                </span>
                 <button
-                  onClick={() => setIsNormPopupOpen(false)}
-                  className="text-slate-400 hover:text-white text-xs"
+                  onClick={() => setAudioSettings({ eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] })}
+                  className="text-slate-400 hover:text-white underline text-[9px]"
                 >
-                  ✕
+                  Reset 0dB
                 </button>
               </div>
 
-              <div className="space-y-2 text-[11px] text-slate-300">
-                <div className="flex items-center justify-between">
-                  <span>Limiter Activo:</span>
+              {/* Normalizador Íntegro de AudioEQ integrado en la parte inferior */}
+              <div className="pt-2 mt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] bg-slate-900/50 p-2 rounded-lg">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-emerald-400" />
+                  <span className="font-bold text-slate-200">Normalizador Soundix:</span>
                   <span className={isNormActive ? "text-emerald-400 font-bold" : "text-slate-500"}>
-                    {isNormActive ? "ON (-0.1 dB True-Peak)" : "OFF"}
+                    {isNormActive ? "-0.1 dBTP ON" : "OFF"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>ReplayGain Target:</span>
-                  <span className="text-cyan-400 font-bold">-14.0 LUFS</span>
-                </div>
+                <input
+                  type="checkbox"
+                  checked={isNormActive}
+                  onChange={(e) => setAudioSettings({ isNormalizerEnabled: e.target.checked })}
+                  className="accent-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                />
               </div>
             </div>
           )}
         </div>
 
-        {/* Audio Output Device Dropdown Button */}
+        {/* NORM Quick Toggle */}
+        <button
+          onClick={() => setAudioSettings({ isNormalizerEnabled: !isNormActive })}
+          className={`px-2 py-1 rounded font-mono text-[10px] font-bold border transition ${
+            isNormActive
+              ? "border-emerald-500 bg-emerald-950/60 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+              : "border-slate-800 bg-slate-900 text-slate-400 hover:text-white"
+          }`}
+          title="Normalizador y Limitador Soundix"
+        >
+          NORM
+        </button>
+
+        {/* Audio Output Device Button (Sin la flechita) */}
         <div className="relative">
           <button
             onClick={() => {
               setIsDeviceMenuOpen(!isDeviceMenuOpen);
               setIsEqPopupOpen(false);
-              setIsNormPopupOpen(false);
             }}
-            className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition flex items-center gap-1.5"
-            title={`Dispositivo: ${selectedDevice}`}
+            className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition flex items-center justify-center"
+            title={`Dispositivo de salida: ${selectedDevice}`}
           >
             <Speaker size={14} style={{ color: appearance.accentColor }} />
-            <ChevronUp size={10} className="text-slate-500" />
           </button>
 
           {isDeviceMenuOpen && (

@@ -144,7 +144,7 @@ pub fn get_track_cover_art(path: String) -> Option<String> {
         return None;
     }
 
-    // 1. Try reading embedded picture tag from symphonia metadata
+    // 1. Try reading embedded picture tag from symphonia metadata across current and past revisions
     if let Ok(file) = std::fs::File::open(p) {
         let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
         let mut hint = symphonia::core::probe::Hint::new();
@@ -154,6 +154,7 @@ pub fn get_track_cover_art(path: String) -> Option<String> {
         let metadata_opts = symphonia::core::meta::MetadataOptions::default();
 
         if let Ok(mut probed) = symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts) {
+            // Check container format metadata
             if let Some(metadata) = probed.format.metadata().current() {
                 if let Some(visual) = metadata.visuals().first() {
                     let mime = if visual.media_type.is_empty() {
@@ -165,19 +166,40 @@ pub fn get_track_cover_art(path: String) -> Option<String> {
                     return Some(format!("data:{};base64,{}", mime, b64));
                 }
             }
+            // Check stream-level metadata
+            if let Some(meta_ref) = probed.metadata.get() {
+                if let Some(rev) = meta_ref.current() {
+                    if let Some(visual) = rev.visuals().first() {
+                        let mime = if visual.media_type.is_empty() {
+                            "image/jpeg"
+                        } else {
+                            &visual.media_type
+                        };
+                        let b64 = base64::engine::general_purpose::STANDARD.encode(&visual.data);
+                        return Some(format!("data:{};base64,{}", mime, b64));
+                    }
+                }
+            }
         }
     }
 
     // 2. Fallback: Search parent directory for common cover image files
     if let Some(parent) = p.parent() {
-        let candidates = ["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png", "album.jpg", "album.png"];
+        let candidates = [
+            "cover.jpg", "cover.png", "cover.jpeg", "cover.webp",
+            "folder.jpg", "folder.png", "folder.jpeg", "folder.webp",
+            "front.jpg", "front.png", "front.jpeg", "front.webp",
+            "album.jpg", "album.png", "album.jpeg", "album.webp",
+            "Cover.jpg", "Cover.png", "Folder.jpg", "Folder.png",
+        ];
         for candidate in &candidates {
             let img_path = parent.join(candidate);
             if img_path.exists() && img_path.is_file() {
                 if let Ok(bytes) = std::fs::read(&img_path) {
-                    let ext = candidate.split('.').last().unwrap_or("jpeg");
-                    let mime = match ext {
+                    let ext = candidate.split('.').last().unwrap_or("jpeg").to_lowercase();
+                    let mime = match ext.as_str() {
                         "png" => "image/png",
+                        "webp" => "image/webp",
                         _ => "image/jpeg",
                     };
                     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);

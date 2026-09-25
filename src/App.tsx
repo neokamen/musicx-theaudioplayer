@@ -29,18 +29,22 @@ export default function App() {
   // Sincronizar variables CSS dinámicas para apariencia en toda la aplicación
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--app-bg", appearance.bgColor || "#090d16");
-    root.style.setProperty("--app-surface", appearance.bgColor ? `${appearance.bgColor}ee` : "#0c1220");
-    root.style.setProperty("--app-surface2", appearance.bgColor ? `${appearance.bgColor}cc` : "#131b2e");
-    root.style.setProperty("--app-accent", appearance.accentColor || "#06b6d4");
+    const bg = appearance.bgColor || "#090d16";
+    const accent = appearance.accentColor || "#06b6d4";
+    const blur = appearance.glassmorphism ? (appearance.glassBlur ?? 10) : 0;
+    const radius = appearance.borderRadius ?? 8;
+    const borderAlpha = appearance.borderEffect ? (appearance.borderOpacity ?? 40) / 100 : 0.2;
+
+    root.style.setProperty("--app-bg", bg);
+    root.style.setProperty("--app-surface", appearance.glassmorphism ? `${bg}d0` : bg);
+    root.style.setProperty("--app-surface2", appearance.glassmorphism ? `${bg}e8` : "#131b2e");
+    root.style.setProperty("--app-accent", accent);
     root.style.setProperty(
       "--app-border",
-      appearance.borderEffect
-        ? `rgba(255, 255, 255, ${(appearance.borderOpacity ?? 40) / 250})`
-        : "rgba(51, 65, 85, 0.4)"
+      `rgba(255, 255, 255, ${borderAlpha * 0.3})`
     );
-    root.style.setProperty("--app-radius", `${appearance.borderRadius ?? 8}px`);
-    root.style.setProperty("--app-blur", `${appearance.glassBlur ?? 10}px`);
+    root.style.setProperty("--app-radius", `${radius}px`);
+    root.style.setProperty("--app-blur", `${blur}px`);
   }, [appearance]);
 
   const handleDragOver = (e: React.DragEvent) => {

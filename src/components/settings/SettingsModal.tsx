@@ -29,7 +29,6 @@ export const SettingsModal: React.FC = () => {
   const totalTracks = libraryTracks.length;
   const totalLibrarySeconds = libraryTracks.reduce((acc, t) => acc + (t.duration_seconds || 0), 0);
   const totalLibraryHours = (totalLibrarySeconds / 3600).toFixed(1);
-  const listenedHours = ((listeningStats?.totalSecondsListened || 0) / 3600).toFixed(1);
 
   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'playback' | 'audio' | 'library' | 'about'>('general');
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -552,44 +551,32 @@ export const SettingsModal: React.FC = () => {
                   Estilo de Barra de Reproducción
                 </h4>
                 <p className="text-xs text-slate-400">
-                  Elige cómo se renderiza la barra central de progreso y visualización de onda.
+                  Elige cómo se renderiza la barra central de progreso en el reproductor.
                 </p>
 
-                <div className="grid grid-cols-3 gap-3 pt-1">
+                <div className="grid grid-cols-2 gap-3 pt-1">
                   <button
                     onClick={() => setPlaybackSettings({ playerBarStyle: 'classic' })}
                     className={`p-3 rounded-lg border text-left transition flex flex-col gap-1 ${
-                      (playbackSettings?.playerBarStyle || 'hybrid') === 'classic'
-                        ? 'border-cyan-500 bg-cyan-950/40 text-white'
+                      (playbackSettings?.playerBarStyle || 'spectrum') === 'classic'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-white shadow-md'
                         : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
                     }`}
                   >
-                    <span className="text-xs font-bold text-cyan-300">Clásico Hi-Fi</span>
-                    <span className="text-[10px] text-slate-400">Barra de progreso fina tradicional</span>
+                    <span className="text-xs font-bold text-cyan-300">Barra Clásica</span>
+                    <span className="text-[10px] text-slate-400">Deslizador fino analógico tradicional</span>
                   </button>
 
                   <button
                     onClick={() => setPlaybackSettings({ playerBarStyle: 'spectrum' })}
                     className={`p-3 rounded-lg border text-left transition flex flex-col gap-1 ${
-                      playbackSettings?.playerBarStyle === 'spectrum'
-                        ? 'border-cyan-500 bg-cyan-950/40 text-white'
+                      (playbackSettings?.playerBarStyle || 'spectrum') === 'spectrum'
+                        ? 'border-cyan-500 bg-cyan-950/40 text-white shadow-md'
                         : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
                     }`}
                   >
-                    <span className="text-xs font-bold text-cyan-300">Espectro Onda</span>
-                    <span className="text-[10px] text-slate-400">Visualizador reactivo en la barra</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPlaybackSettings({ playerBarStyle: 'hybrid' })}
-                    className={`p-3 rounded-lg border text-left transition flex flex-col gap-1 ${
-                      playbackSettings?.playerBarStyle === 'hybrid'
-                        ? 'border-cyan-500 bg-cyan-950/40 text-white'
-                        : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="text-xs font-bold text-cyan-300">Híbrido (Recomendado)</span>
-                    <span className="text-[10px] text-slate-400">Barra de tiempo con mini-espectro</span>
+                    <span className="text-xs font-bold text-cyan-300">Espectro de la Canción</span>
+                    <span className="text-[10px] text-slate-400">Visualizador dinámico reactivo integrado</span>
                   </button>
                 </div>
               </div>
@@ -816,7 +803,7 @@ export const SettingsModal: React.FC = () => {
                 {/* Estadísticas Nerd de la Biblioteca */}
                 <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3 font-mono">
                   <div className="text-xs uppercase text-cyan-400 font-bold tracking-wider flex items-center justify-between">
-                    <span>Telemetría Nerd de Biblioteca</span>
+                    <span>Telemetría de Biblioteca</span>
                     <button
                       onClick={resetStats}
                       className="text-[10px] text-rose-400 hover:text-rose-300 underline font-normal"
@@ -837,19 +824,39 @@ export const SettingsModal: React.FC = () => {
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
-                      <span className="text-[10px] text-slate-400 block">Horas de Música Escuchada</span>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={listenedHours}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setListeningStats({ totalSecondsListened: Math.round(val * 3600) });
-                          }}
-                          className="w-16 bg-slate-900 border border-slate-700 rounded px-1 text-cyan-300 font-bold text-xs"
-                        />
-                        <span className="text-slate-400 text-xs">horas</span>
+                      <span className="text-[10px] text-slate-400 block">Tiempo de Escucha Acumulado</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={Math.floor((listeningStats?.totalSecondsListened || 0) / 3600)}
+                            onChange={(e) => {
+                              const h = parseInt(e.target.value) || 0;
+                              const currentSecs = listeningStats?.totalSecondsListened || 0;
+                              const m = Math.floor((currentSecs % 3600) / 60);
+                              setListeningStats({ totalSecondsListened: h * 3600 + m * 60 });
+                            }}
+                            className="w-12 bg-slate-900 border border-slate-700 rounded px-1 text-cyan-300 font-bold text-xs text-center"
+                          />
+                          <span className="text-slate-400 text-[10px]">h</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={Math.floor(((listeningStats?.totalSecondsListened || 0) % 3600) / 60)}
+                            onChange={(e) => {
+                              const m = parseInt(e.target.value) || 0;
+                              const currentSecs = listeningStats?.totalSecondsListened || 0;
+                              const h = Math.floor(currentSecs / 3600);
+                              setListeningStats({ totalSecondsListened: h * 3600 + Math.min(59, m) * 60 });
+                            }}
+                            className="w-12 bg-slate-900 border border-slate-700 rounded px-1 text-cyan-300 font-bold text-xs text-center"
+                          />
+                          <span className="text-slate-400 text-[10px]">min</span>
+                        </div>
                       </div>
                     </div>
 

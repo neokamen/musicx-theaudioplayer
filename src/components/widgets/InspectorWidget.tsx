@@ -17,12 +17,9 @@ export const InspectorWidget: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans overflow-hidden text-xs">
-      <div className="p-2 border-b border-audiophile-border bg-audiophile-surface2 flex items-center justify-between shrink-0">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-audiophile-muted flex items-center gap-1.5">
-          <Info size={12} style={{ color: appearance.accentColor }} />
-          Inspector Técnico & Códec
-        </span>
-        <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
+      <div className="p-1.5 border-b border-audiophile-border bg-audiophile-surface2 flex items-center justify-between shrink-0">
+        <Info size={12} style={{ color: appearance.accentColor }} />
+        <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-700 text-slate-300">
           METADATA
         </span>
       </div>

@@ -10,6 +10,7 @@ import {
   Play,
   Plus,
   Volume2,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { Track } from "../../types/index.ts";
 
@@ -47,6 +48,14 @@ export const VirtualTrackList: React.FC = () => {
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("artist");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [visibleCols, setVisibleCols] = useState({
+    artist: true,
+    album: true,
+    format: true,
+    bitrate: true,
+    duration: true,
+  });
+  const [isColMenuOpen, setIsColMenuOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -90,11 +99,11 @@ export const VirtualTrackList: React.FC = () => {
     });
   }, [libraryTracks, sortField, sortDirection]);
 
-  // Virtualizador de filas de alto rendimiento (60+ FPS para 50.000+ pistas)
+  // Virtualizador de filas de alto rendimiento
   const rowVirtualizer = useVirtualizer({
     count: sortedTracks.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 32, // 32px por fila
+    estimateSize: () => 32,
     overscan: 20,
   });
 
@@ -153,6 +162,68 @@ export const VirtualTrackList: React.FC = () => {
               </span>
             </div>
           )}
+
+          <div className="relative">
+            <button
+              onClick={() => setIsColMenuOpen(!isColMenuOpen)}
+              className="p-1.5 rounded bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition"
+              title="Personalizar columnas visibles"
+            >
+              <SlidersHorizontal size={13} />
+            </button>
+
+            {isColMenuOpen && (
+              <div className="absolute top-8 right-0 w-44 p-2 bg-slate-950 border border-slate-700 shadow-2xl rounded-lg z-50 font-mono text-[10px] space-y-1.5">
+                <div className="text-slate-400 font-bold border-b border-slate-800 pb-1">Columnas de Biblioteca</div>
+                <label className="flex items-center justify-between cursor-pointer text-slate-200">
+                  <span>Artista</span>
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.artist}
+                    onChange={(e) => setVisibleCols({ ...visibleCols, artist: e.target.checked })}
+                    className="accent-cyan-400"
+                  />
+                </label>
+                <label className="flex items-center justify-between cursor-pointer text-slate-200">
+                  <span>Álbum</span>
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.album}
+                    onChange={(e) => setVisibleCols({ ...visibleCols, album: e.target.checked })}
+                    className="accent-cyan-400"
+                  />
+                </label>
+                <label className="flex items-center justify-between cursor-pointer text-slate-200">
+                  <span>Formato</span>
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.format}
+                    onChange={(e) => setVisibleCols({ ...visibleCols, format: e.target.checked })}
+                    className="accent-cyan-400"
+                  />
+                </label>
+                <label className="flex items-center justify-between cursor-pointer text-slate-200">
+                  <span>Bitrate</span>
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.bitrate}
+                    onChange={(e) => setVisibleCols({ ...visibleCols, bitrate: e.target.checked })}
+                    className="accent-cyan-400"
+                  />
+                </label>
+                <label className="flex items-center justify-between cursor-pointer text-slate-200">
+                  <span>Duración</span>
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.duration}
+                    onChange={(e) => setVisibleCols({ ...visibleCols, duration: e.target.checked })}
+                    className="accent-cyan-400"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => fetchLibraryTracks(search)}
             className="p-1.5 rounded hover:bg-audiophile-border text-audiophile-text transition-colors"
@@ -163,57 +234,73 @@ export const VirtualTrackList: React.FC = () => {
         </div>
       </div>
 
-      {/* Encabezado fijo de columnas ordenables */}
+      {/* Encabezado fijo de columnas ordenables con alineación perfecta */}
       <div className="h-8 bg-audiophile-base border-b border-audiophile-border text-[10px] font-mono text-audiophile-muted uppercase tracking-wider flex items-center px-3 shrink-0">
         <div
           onClick={() => handleSort("track_number")}
-          className="w-10 text-center cursor-pointer flex items-center justify-center gap-1 group/col hover:text-white"
+          className="w-10 text-center cursor-pointer flex items-center justify-center gap-1 group/col hover:text-white shrink-0"
         >
           <span>#</span>
           {renderSortIndicator("track_number")}
         </div>
+
         <div
           onClick={() => handleSort("title")}
-          className="flex-1 min-w-[180px] cursor-pointer flex items-center gap-1 group/col hover:text-white"
+          className="flex-1 min-w-[150px] cursor-pointer flex items-center gap-1 group/col hover:text-white pr-2 truncate"
         >
           <span>Título</span>
           {renderSortIndicator("title")}
         </div>
-        <div
-          onClick={() => handleSort("artist")}
-          className="w-44 cursor-pointer flex items-center gap-1 group/col hover:text-white"
-        >
-          <span>Artista</span>
-          {renderSortIndicator("artist")}
-        </div>
-        <div
-          onClick={() => handleSort("album")}
-          className="w-44 cursor-pointer flex items-center gap-1 group/col hover:text-white"
-        >
-          <span>Álbum</span>
-          {renderSortIndicator("album")}
-        </div>
-        <div
-          onClick={() => handleSort("format")}
-          className="w-20 text-center cursor-pointer flex items-center justify-center gap-1 group/col hover:text-white"
-        >
-          <span>Formato</span>
-          {renderSortIndicator("format")}
-        </div>
-        <div
-          onClick={() => handleSort("bitrate_kbps")}
-          className="w-20 text-right cursor-pointer flex items-center justify-end gap-1 group/col hover:text-white"
-        >
-          <span>Bitrate</span>
-          {renderSortIndicator("bitrate_kbps")}
-        </div>
-        <div
-          onClick={() => handleSort("duration_seconds")}
-          className="w-20 text-right cursor-pointer flex items-center justify-end gap-1 group/col hover:text-white"
-        >
-          <span>Duración</span>
-          {renderSortIndicator("duration_seconds")}
-        </div>
+
+        {visibleCols.artist && (
+          <div
+            onClick={() => handleSort("artist")}
+            className="w-40 cursor-pointer flex items-center gap-1 group/col hover:text-white shrink-0 pr-2 truncate"
+          >
+            <span>Artista</span>
+            {renderSortIndicator("artist")}
+          </div>
+        )}
+
+        {visibleCols.album && (
+          <div
+            onClick={() => handleSort("album")}
+            className="w-40 cursor-pointer flex items-center gap-1 group/col hover:text-white shrink-0 pr-2 truncate"
+          >
+            <span>Álbum</span>
+            {renderSortIndicator("album")}
+          </div>
+        )}
+
+        {visibleCols.format && (
+          <div
+            onClick={() => handleSort("format")}
+            className="w-20 text-center cursor-pointer flex items-center justify-center gap-1 group/col hover:text-white shrink-0"
+          >
+            <span>Formato</span>
+            {renderSortIndicator("format")}
+          </div>
+        )}
+
+        {visibleCols.bitrate && (
+          <div
+            onClick={() => handleSort("bitrate_kbps")}
+            className="w-20 text-right cursor-pointer flex items-center justify-end gap-1 group/col hover:text-white shrink-0 pr-2"
+          >
+            <span>Bitrate</span>
+            {renderSortIndicator("bitrate_kbps")}
+          </div>
+        )}
+
+        {visibleCols.duration && (
+          <div
+            onClick={() => handleSort("duration_seconds")}
+            className="w-16 text-right cursor-pointer flex items-center justify-end gap-1 group/col hover:text-white shrink-0"
+          >
+            <span>Duración</span>
+            {renderSortIndicator("duration_seconds")}
+          </div>
+        )}
       </div>
 
       {/* Contenedor Virtualizado con @tanstack/react-virtual */}
@@ -262,7 +349,7 @@ export const VirtualTrackList: React.FC = () => {
                     height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  className={`flex items-center px-3 border-b border-audiophile-border/30 hover:bg-audiophile-surface2/80 cursor-pointer font-mono text-[11px] group transition-colors ${
+                  className={`flex items-center px-3 hover:bg-audiophile-surface2/80 cursor-pointer font-mono text-[11px] group transition-colors ${
                     isCurrent
                       ? "bg-audiophile-cyan/15 text-audiophile-cyan font-semibold"
                       : "text-audiophile-text"
@@ -276,33 +363,43 @@ export const VirtualTrackList: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex-1 min-w-[180px] truncate pr-2">
+                  <div className="flex-1 min-w-[150px] truncate pr-2">
                     <span className="truncate group-hover:text-white hover-marquee" title={track.title}>
                       {track.title}
                     </span>
                   </div>
 
-                  <div className="w-44 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2">
-                    {track.artist}
-                  </div>
+                  {visibleCols.artist && (
+                    <div className="w-40 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2 shrink-0">
+                      {track.artist}
+                    </div>
+                  )}
 
-                  <div className="w-44 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2">
-                    {track.album}
-                  </div>
+                  {visibleCols.album && (
+                    <div className="w-40 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2 shrink-0">
+                      {track.album}
+                    </div>
+                  )}
 
-                  <div className="w-20 text-center shrink-0">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-audiophile-border/80 font-medium">
-                      {track.format} {track.bit_depth > 0 ? `${track.bit_depth}b` : ""}
-                    </span>
-                  </div>
+                  {visibleCols.format && (
+                    <div className="w-20 text-center shrink-0">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-audiophile-border/80 font-medium text-slate-300">
+                        {track.format} {track.bit_depth > 0 ? `${track.bit_depth}b` : ""}
+                      </span>
+                    </div>
+                  )}
 
-                  <div className="w-20 text-right text-audiophile-muted shrink-0 text-[10px]">
-                    {track.bitrate_kbps > 0 ? `${track.bitrate_kbps}k` : "---"}
-                  </div>
+                  {visibleCols.bitrate && (
+                    <div className="w-20 text-right text-audiophile-muted shrink-0 text-[10px] pr-2">
+                      {track.bitrate_kbps > 0 ? `${track.bitrate_kbps}k` : "---"}
+                    </div>
+                  )}
 
-                  <div className="w-20 text-right text-audiophile-muted shrink-0">
-                    {formatDuration(track.duration_seconds)}
-                  </div>
+                  {visibleCols.duration && (
+                    <div className="w-16 text-right text-audiophile-muted shrink-0">
+                      {formatDuration(track.duration_seconds)}
+                    </div>
+                  )}
                 </div>
               );
             })}

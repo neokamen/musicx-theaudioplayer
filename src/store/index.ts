@@ -39,6 +39,7 @@ export interface AudioSettingsState {
   isEqEnabled: boolean;
   isNormalizerEnabled: boolean;
   isXdssEnabled: boolean;
+  isXtsProEnabled: boolean;
   tubeWarmth: boolean;
   eqGains: number[];
 }
@@ -173,6 +174,7 @@ const defaultAudioSettings: AudioSettingsState = {
   isEqEnabled: false,
   isNormalizerEnabled: true,
   isXdssEnabled: false,
+  isXtsProEnabled: false,
   tubeWarmth: false,
   eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
@@ -615,6 +617,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
         eq_gains: next.eqGains,
         is_normalizer_enabled: next.isNormalizerEnabled,
         is_xdss_enabled: next.isXdssEnabled,
+        is_xts_pro_enabled: next.isXtsProEnabled,
         tube_warmth: next.tubeWarmth,
       }).catch(() => {});
       return { audioSettings: next };
@@ -796,12 +799,35 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
       if (telemetry.filepath && telemetry.filepath !== state.telemetry.filepath) {
         get().fetchTrackCoverArt(telemetry.filepath);
       }
+
+      // Calculate time delta for active listening telemetry
+      let updatedStats = state.listeningStats;
+      if (telemetry.state === "Playing" && telemetry.current_time > state.telemetry.current_time) {
+        const delta = Math.min(2, Math.max(0, telemetry.current_time - state.telemetry.current_time));
+        if (delta > 0) {
+          const nextSecs = state.listeningStats.totalSecondsListened + delta;
+          updatedStats = { ...state.listeningStats, totalSecondsListened: nextSecs };
+          // Cache to localStorage periodically
+          if (Math.floor(nextSecs) % 10 === 0) {
+            saveStoredSettings({
+              language: state.language,
+              appearance: state.appearance,
+              audioSettings: state.audioSettings,
+              playbackSettings: state.playbackSettings,
+              listeningStats: updatedStats,
+              librarySettings: state.librarySettings,
+            });
+          }
+        }
+      }
+
       return {
         telemetry,
         isPlaying: telemetry.state === "Playing",
         volume: telemetry.volume,
         bitPerfectMode: telemetry.is_bit_perfect,
         selectedDevice: telemetry.output_device,
+        listeningStats: updatedStats,
         currentTrack:
           state.currentTrack && state.currentTrack.filepath === telemetry.filepath
             ? {

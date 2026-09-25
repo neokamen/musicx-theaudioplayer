@@ -12,19 +12,16 @@ export const CoverWidget: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans overflow-hidden text-xs">
-      <div className="p-2 border-b border-audiophile-border bg-audiophile-surface2 flex items-center justify-between shrink-0">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-audiophile-muted flex items-center gap-1.5">
-          <ImageIcon size={12} style={{ color: appearance.accentColor }} />
-          Carátula del Álbum
-        </span>
+      <div className="p-1.5 border-b border-audiophile-border bg-audiophile-surface2 flex items-center justify-between shrink-0">
+        <ImageIcon size={12} style={{ color: appearance.accentColor }} />
         <span
-          className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-slate-700 font-bold"
+          className="font-mono text-[9px] px-1.5 py-0.2 rounded border border-slate-700 font-bold"
           style={{
             color: appearance.accentColor,
             backgroundColor: `${appearance.accentColor}15`,
           }}
         >
-          {isPlaying ? "PLAYING ART" : "STANDBY"}
+          {isPlaying ? "ART" : "STANDBY"}
         </span>
       </div>
 
