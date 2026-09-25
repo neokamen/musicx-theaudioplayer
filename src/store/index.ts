@@ -141,7 +141,7 @@ export interface MusicPlayerStore {
   initListeners: () => Promise<() => void>;
 }
 
-const SETTINGS_STORAGE_KEY = "musicx_settings_v9";
+const SETTINGS_STORAGE_KEY = "musicx_settings_v5";
 
 const defaultAppearance: AppearanceState = {
   accentColor: "#06b6d4", // Cyan
