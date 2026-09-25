@@ -135,3 +135,57 @@ pub fn scan_directory(path: String, app_handle: AppHandle, state: State<'_, AppS
 pub fn read_directory_lazy(path: String) -> Result<Vec<FileEntry>, String> {
     fs_lazy::read_directory_lazy_internal(path)
 }
+
+#[tauri::command]
+pub fn get_track_cover_art(path: String) -> Option<String> {
+    use base64::Engine;
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return None;
+    }
+
+    // 1. Try reading embedded picture tag from symphonia metadata
+    if let Ok(file) = std::fs::File::open(p) {
+        let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let mut hint = symphonia::core::probe::Hint::new();
+        hint.with_extension(&ext);
+        let mss = symphonia::core::io::MediaSourceStream::new(Box::new(file), Default::default());
+        let format_opts = symphonia::core::formats::FormatOptions::default();
+        let metadata_opts = symphonia::core::meta::MetadataOptions::default();
+
+        if let Ok(mut probed) = symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts) {
+            if let Some(metadata) = probed.format.metadata().current() {
+                if let Some(visual) = metadata.visuals().first() {
+                    let mime = if visual.media_type.is_empty() {
+                        "image/jpeg"
+                    } else {
+                        &visual.media_type
+                    };
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&visual.data);
+                    return Some(format!("data:{};base64,{}", mime, b64));
+                }
+            }
+        }
+    }
+
+    // 2. Fallback: Search parent directory for common cover image files
+    if let Some(parent) = p.parent() {
+        let candidates = ["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png", "album.jpg", "album.png"];
+        for candidate in &candidates {
+            let img_path = parent.join(candidate);
+            if img_path.exists() && img_path.is_file() {
+                if let Ok(bytes) = std::fs::read(&img_path) {
+                    let ext = candidate.split('.').last().unwrap_or("jpeg");
+                    let mime = match ext {
+                        "png" => "image/png",
+                        _ => "image/jpeg",
+                    };
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                    return Some(format!("data:{};base64,{}", mime, b64));
+                }
+            }
+        }
+    }
+
+    None
+}

@@ -11,6 +11,7 @@ import {
   Repeat,
   Repeat1,
   Cpu,
+  Settings,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -26,9 +27,11 @@ export const HiFiPlayerBar: React.FC = () => {
     volume,
     currentTrack,
     telemetry,
+    currentCoverArt,
     shuffle,
     repeat,
     bitPerfectMode,
+    setSettingsOpen,
     togglePlayPause,
     nextTrack,
     previousTrack,
@@ -59,9 +62,9 @@ export const HiFiPlayerBar: React.FC = () => {
 
   // Telemetría DAC
   const isBitPerfect = bitPerfectMode || telemetry.is_bit_perfect;
-  const sampleRateKhz = telemetry.sample_rate ? (telemetry.sample_rate / 1000).toFixed(1) : "---";
-  const bitDepth = telemetry.bits_per_sample ? `${telemetry.bits_per_sample}-bit` : "---";
-  const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 0;
+  const sampleRateKhz = telemetry.sample_rate ? (telemetry.sample_rate / 1000).toFixed(1) : "44.1";
+  const bitDepth = telemetry.bits_per_sample ? `${telemetry.bits_per_sample}-bit` : "16-bit";
+  const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 1411;
 
   // Driver de salida
   const isAlsaDirect = telemetry.output_device.toLowerCase().includes("hw:") || isBitPerfect;
@@ -69,16 +72,24 @@ export const HiFiPlayerBar: React.FC = () => {
 
   return (
     <footer className="h-20 border-t border-audiophile-border bg-audiophile-surface px-4 flex items-center justify-between gap-4 font-sans select-none z-40 shrink-0">
-      {/* 1. Track Info con Badge de Códec */}
+      {/* 1. Track Info con Carátula / Badge de Códec */}
       <div className="flex items-center gap-3 w-1/4 min-w-[220px] overflow-hidden">
-        <div className="w-12 h-12 rounded-lg bg-audiophile-base border border-audiophile-border flex flex-col items-center justify-center shrink-0 shadow-inner">
-          <span className="font-mono text-[11px] font-black text-audiophile-cyan tracking-wider">
-            {format}
-          </span>
-          <span className="font-mono text-[8px] text-audiophile-muted uppercase">
-            Hi-Res
-          </span>
-        </div>
+        {currentCoverArt ? (
+          <img
+            src={currentCoverArt}
+            alt="Track Cover"
+            className="w-12 h-12 rounded-lg object-cover border border-audiophile-border shrink-0 shadow-md"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-audiophile-base border border-audiophile-border flex flex-col items-center justify-center shrink-0 shadow-inner">
+            <span className="font-mono text-[11px] font-black text-audiophile-cyan tracking-wider">
+              {format}
+            </span>
+            <span className="font-mono text-[8px] text-audiophile-muted uppercase">
+              Hi-Res
+            </span>
+          </div>
+        )}
 
         <div className="truncate">
           <div className="font-semibold text-xs text-white truncate flex items-center gap-1.5" title={title}>
@@ -168,7 +179,7 @@ export const HiFiPlayerBar: React.FC = () => {
           {/* Frecuencia y Bits Reales */}
           <div className="flex flex-col text-right">
             <span className="text-[10px] font-bold text-audiophile-cyan tracking-wider">
-              {sampleRateKhz !== "---" ? `${sampleRateKhz} kHz` : "---"}
+              {sampleRateKhz} kHz
             </span>
             <span className="text-[9px] text-audiophile-amber">
               {bitDepth}
@@ -181,7 +192,7 @@ export const HiFiPlayerBar: React.FC = () => {
           <div className="flex flex-col">
             <span className="text-[10px] font-semibold text-audiophile-text flex items-center gap-1">
               <Cpu size={10} className="text-audiophile-cyan" />
-              {bitrate > 0 ? `${bitrate} kbps` : "---"}
+              {bitrate > 0 ? `${bitrate} kbps` : "1411 kbps"}
             </span>
             {/* Indicador LED de modo de salida */}
             <span className="text-[9px] flex items-center gap-1.5 mt-0.5 truncate max-w-[120px]">
@@ -199,26 +210,37 @@ export const HiFiPlayerBar: React.FC = () => {
           </div>
         </div>
 
-        {/* Control de volumen */}
-        <div className="flex items-center gap-2">
+        {/* Control de volumen & Botón de Ajustes */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setVolume(volume > 0 ? 0 : 1)}
+              className="text-audiophile-muted hover:text-white transition-colors"
+            >
+              {volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1.5}
+              step={0.01}
+              value={volume}
+              onChange={handleVolume}
+              className="w-16 h-1 bg-audiophile-border rounded-lg appearance-none cursor-pointer accent-audiophile-cyan"
+              title={`Volumen: ${(volume * 100).toFixed(0)}%`}
+            />
+          </div>
+
           <button
-            onClick={() => setVolume(volume > 0 ? 0 : 1)}
-            className="text-audiophile-muted hover:text-white transition-colors"
+            onClick={() => setSettingsOpen(true)}
+            className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500 text-slate-300 hover:text-cyan-400 transition-all shadow-sm"
+            title="Ajustes de musicx"
           >
-            {volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
+            <Settings size={16} />
           </button>
-          <input
-            type="range"
-            min={0}
-            max={1.5}
-            step={0.01}
-            value={volume}
-            onChange={handleVolume}
-            className="w-16 h-1 bg-audiophile-border rounded-lg appearance-none cursor-pointer accent-audiophile-cyan"
-            title={`Volumen: ${(volume * 100).toFixed(0)}%`}
-          />
         </div>
       </div>
     </footer>
   );
 };
+;

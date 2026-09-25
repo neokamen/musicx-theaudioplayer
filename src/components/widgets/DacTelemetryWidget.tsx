@@ -1,6 +1,7 @@
 import React from "react";
 import { useMusicStore } from "../../store/index.ts";
 import { Activity, ShieldCheck, Zap, Speaker, Sliders } from "lucide-react";
+import { SpectrumVisualizer } from "./SpectrumVisualizer.tsx";
 
 export const DacTelemetryWidget: React.FC = () => {
   const {
@@ -13,8 +14,13 @@ export const DacTelemetryWidget: React.FC = () => {
   } = useMusicStore();
 
   const isBitPerfect = bitPerfectMode || telemetry.is_bit_perfect;
-  const sampleRateKhz = telemetry.sample_rate ? (telemetry.sample_rate / 1000).toFixed(1) : "---";
-  const bitDepth = telemetry.bits_per_sample ? `${telemetry.bits_per_sample}-bit` : "---";
+  // Use active telemetry sample rate or clean 44.1 kHz fallback when stopped
+  const sampleRateKhz = telemetry.sample_rate > 0 
+    ? (telemetry.sample_rate / 1000).toFixed(1) 
+    : "44.1";
+  const bitDepth = telemetry.bits_per_sample > 0 
+    ? `${telemetry.bits_per_sample}-bit` 
+    : "16-bit";
 
   return (
     <div className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans overflow-hidden text-xs">
@@ -111,6 +117,11 @@ export const DacTelemetryWidget: React.FC = () => {
               <Sliders size={10} className="text-audiophile-amber" /> {(telemetry.volume * 100).toFixed(0)}%
             </span>
           </div>
+        </div>
+
+        {/* ESPECTRO DE AUDIO A TIEMPO REAL (debajo de latencia estimada) */}
+        <div className="pt-2">
+          <SpectrumVisualizer height={140} showControls={true} />
         </div>
       </div>
     </div>

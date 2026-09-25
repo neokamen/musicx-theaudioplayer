@@ -167,7 +167,7 @@ impl AudioEngineInternal {
             pcm_buffer: Arc::new(Mutex::new(VecDeque::with_capacity(96_000 * 2))),
             cpal_stream: None,
             output_device_name: None,
-            bit_perfect: false,
+            bit_perfect: true,
             volume: Arc::new(Mutex::new(1.0)),
             is_playing: Arc::new(AtomicBool::new(false)),
             active_sample_rate: 44_100,

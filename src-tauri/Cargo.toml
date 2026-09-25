@@ -31,6 +31,9 @@ jwalk = "0.8"
 mpris-player = "0.6"
 glib = "0.15"
 
+# Fast Base64 encoding for embedded cover art
+base64 = "0.22"
+
 [profile.release]
 codegen-units = 1
 lto = true

@@ -3,15 +3,15 @@ import { useMusicStore } from "../../store/index.ts";
 import { Disc3, FileAudio, Info, Cpu, Layers } from "lucide-react";
 
 export const InspectorWidget: React.FC = () => {
-  const { currentTrack, telemetry } = useMusicStore();
+  const { currentTrack, telemetry, currentCoverArt } = useMusicStore();
 
   const title = telemetry.track_title || currentTrack?.title || "Ninguna pista seleccionada";
   const artist = telemetry.track_artist || currentTrack?.artist || "---";
   const album = telemetry.track_album || currentTrack?.album || "---";
   const format = currentTrack?.format || (telemetry.filepath ? telemetry.filepath.split(".").pop()?.toUpperCase() : "PCM");
-  const sampleRate = telemetry.sample_rate || currentTrack?.sample_rate || 0;
-  const bitDepth = telemetry.bits_per_sample || currentTrack?.bit_depth || 0;
-  const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 0;
+  const sampleRate = telemetry.sample_rate || currentTrack?.sample_rate || 44100;
+  const bitDepth = telemetry.bits_per_sample || currentTrack?.bit_depth || 16;
+  const bitrate = telemetry.bitrate || currentTrack?.bitrate_kbps || 1411;
   const channels = telemetry.channels === 1 ? "Mono" : telemetry.channels === 2 ? "Stereo (2.0)" : `${telemetry.channels} ch`;
 
   return (
@@ -27,18 +27,29 @@ export const InspectorWidget: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center gap-4">
-        {/* Simulación de Carátula de Vinilo / Álbum Hi-Fi */}
-        <div className="relative w-40 h-40 rounded-lg bg-audiophile-base border border-audiophile-border shadow-xl flex items-center justify-center group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-tr from-audiophile-surface to-transparent opacity-60" />
-          <Disc3
-            size={72}
-            className={`text-audiophile-muted/40 transition-transform duration-1000 ${
-              telemetry.state === "Playing" ? "animate-spin text-audiophile-cyan/40" : ""
-            }`}
-            style={{ animationDuration: "6s" }}
-          />
-          <div className="absolute bottom-2 left-2 right-2 text-center">
-            <span className="font-mono text-[9px] uppercase tracking-wider text-audiophile-muted bg-audiophile-base/80 px-2 py-0.5 rounded backdrop-blur border border-audiophile-border/50 block truncate">
+        {/* Carátula de la Canción con Fallback Hi-Fi */}
+        <div className="relative w-44 h-44 rounded-lg bg-audiophile-base border border-audiophile-border shadow-xl flex items-center justify-center group overflow-hidden">
+          {currentCoverArt ? (
+            <img
+              src={currentCoverArt}
+              alt={album}
+              className="w-full h-full object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-tr from-audiophile-surface to-transparent opacity-60" />
+              <Disc3
+                size={72}
+                className={`text-audiophile-muted/40 transition-transform duration-1000 ${
+                  telemetry.state === "Playing" ? "animate-spin text-audiophile-cyan/40" : ""
+                }`}
+                style={{ animationDuration: "6s" }}
+              />
+            </>
+          )}
+
+          <div className="absolute bottom-2 left-2 right-2 text-center pointer-events-none">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white bg-slate-950/80 px-2 py-0.5 rounded backdrop-blur border border-slate-700/50 block truncate shadow-md">
               {album}
             </span>
           </div>
@@ -68,7 +79,7 @@ export const InspectorWidget: React.FC = () => {
               <Cpu size={10} className="text-audiophile-cyan" /> Bitrate Promedio
             </span>
             <span className="font-bold text-audiophile-cyan mt-1">
-              {bitrate > 0 ? `${bitrate} kbps` : "---"}
+              {bitrate > 0 ? `${bitrate} kbps` : "1411 kbps"}
             </span>
           </div>
 
@@ -77,7 +88,7 @@ export const InspectorWidget: React.FC = () => {
               <Layers size={10} className="text-audiophile-green" /> Resolución PCM
             </span>
             <span className="font-bold text-audiophile-text mt-1">
-              {sampleRate > 0 ? `${sampleRate / 1000} kHz / ${bitDepth}b` : "---"}
+              {sampleRate > 0 ? `${sampleRate / 1000} kHz / ${bitDepth}b` : "44.1 kHz / 16b"}
             </span>
           </div>
 

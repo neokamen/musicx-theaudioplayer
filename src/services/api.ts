@@ -125,6 +125,10 @@ export async function onScanProgress(
   });
 }
 
+export async function getTrackCoverArt(filepath: string): Promise<string | null> {
+  return invoke<string | null>("get_track_cover_art", { path: filepath });
+}
+
 export async function onTrackEnded(
   callback: (filepath: string) => void
 ): Promise<UnlistenFn> {

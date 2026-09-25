@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { AudioTelemetry, FileNode, PlaybackState, RepeatMode, ScanStatus, Track } from "../types/index.ts";
 import * as api from "../services/api.ts";
+import type { Language } from "../i18n/translations.ts";
+import type { SpectrumStyle } from "../components/widgets/SpectrumVisualizer.tsx";
 
 export interface ExplorerState {
   currentPath: string;
@@ -9,6 +11,28 @@ export interface ExplorerState {
   error: string | null;
   history: string[];
   historyIndex: number;
+}
+
+export interface AppearanceState {
+  accentColor: string;
+  accentPreset: string;
+  bgColor: string;
+  bgPreset: string;
+  glassmorphism: boolean;
+  glassBlur: number;
+  neonGlow: boolean;
+  neonIntensity: number;
+  borderEffect: boolean;
+  borderOpacity: number;
+  borderRadius: number;
+  borderGlow: boolean;
+  spectrumFps: 30 | 60 | 120;
+  spectrumStyle: SpectrumStyle;
+}
+
+export interface LibrarySettings {
+  musicFolder: string;
+  autoScanOnStartup: boolean;
 }
 
 export interface MusicPlayerStore {
@@ -31,6 +55,15 @@ export interface MusicPlayerStore {
 
   explorer: ExplorerState;
 
+  // Settings & Customizations
+  language: Language;
+  appearance: AppearanceState;
+  librarySettings: LibrarySettings;
+  isSettingsOpen: boolean;
+  currentCoverArt: string | null;
+  coverArtCache: Record<string, string>;
+
+  // Actions
   play: (track?: Track) => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
@@ -59,30 +92,101 @@ export interface MusicPlayerStore {
   navigateForward: () => Promise<void>;
   navigateUp: () => Promise<void>;
 
+  // Settings actions
+  setLanguage: (lang: Language) => void;
+  setAppearance: (appearance: Partial<AppearanceState>) => void;
+  setLibrarySettings: (settings: Partial<LibrarySettings>) => void;
+  setSettingsOpen: (open: boolean) => void;
+  fetchTrackCoverArt: (filepath: string) => Promise<string | null>;
+  saveWindowSize: () => Promise<void>;
+
   updateTelemetry: (telemetry: AudioTelemetry) => void;
   updateScanStatus: (status: ScanStatus) => void;
   handleTrackEnded: (filepath: string) => Promise<void>;
   initListeners: () => Promise<() => void>;
 }
 
+const SETTINGS_STORAGE_KEY = "musicx_settings_v1";
+
+const defaultAppearance: AppearanceState = {
+  accentColor: "#06b6d4", // Cyan
+  accentPreset: "cyan",
+  bgColor: "#090d16",
+  bgPreset: "obsidian",
+  glassmorphism: true,
+  glassBlur: 10,
+  neonGlow: true,
+  neonIntensity: 50,
+  borderEffect: true,
+  borderOpacity: 40,
+  borderRadius: 8,
+  borderGlow: true,
+  spectrumFps: 60,
+  spectrumStyle: "bars",
+};
+
+const defaultLibrarySettings: LibrarySettings = {
+  musicFolder: "/home",
+  autoScanOnStartup: true,
+};
+
+function loadStoredSettings(): {
+  language: Language;
+  appearance: AppearanceState;
+  librarySettings: LibrarySettings;
+} {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        language: parsed.language || "es",
+        appearance: { ...defaultAppearance, ...(parsed.appearance || {}) },
+        librarySettings: { ...defaultLibrarySettings, ...(parsed.librarySettings || {}) },
+      };
+    }
+  } catch {
+    // Fallback on parse failure
+  }
+  return {
+    language: "es",
+    appearance: defaultAppearance,
+    librarySettings: defaultLibrarySettings,
+  };
+}
+
+function saveStoredSettings(state: {
+  language: Language;
+  appearance: AppearanceState;
+  librarySettings: LibrarySettings;
+}) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore write failure
+  }
+}
+
+const stored = loadStoredSettings();
+
 const initialTelemetry: AudioTelemetry = {
   state: "Stopped" as PlaybackState,
   current_time: 0,
   duration: 0,
-  sample_rate: 0,
-  bits_per_sample: 0,
-  bitrate: 0,
+  sample_rate: 44100,
+  bits_per_sample: 16,
+  bitrate: 1411,
   channels: 2,
   volume: 1.0,
-  is_bit_perfect: false,
-  output_device: "Default",
+  is_bit_perfect: true, // Bit-perfect exclusive mode on by default
+  output_device: "ALSA (Bit-Perfect Direct)",
   track_title: null,
   track_artist: null,
   track_album: null,
   filepath: null,
 };
 
-const defaultHomePath = "/home";
+const defaultHomePath = stored.librarySettings.musicFolder || "/home";
 
 export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   isPlaying: false,
@@ -96,7 +200,7 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   telemetry: initialTelemetry,
   availableDevices: [],
   selectedDevice: "Default",
-  bitPerfectMode: false,
+  bitPerfectMode: true, // Bit-perfect exclusive by default
 
   libraryTracks: [],
   scanStatus: {
@@ -115,17 +219,27 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     historyIndex: 0,
   },
 
+  language: stored.language,
+  appearance: stored.appearance,
+  librarySettings: stored.librarySettings,
+  isSettingsOpen: false,
+  currentCoverArt: null,
+  coverArtCache: {},
+
   play: async (track?: Track) => {
     const targetTrack = track ?? get().currentTrack;
     if (!targetTrack) return;
 
-    const { bitPerfectMode, selectedDevice } = get();
+    const { bitPerfectMode, selectedDevice, fetchTrackCoverArt } = get();
 
     await api.playTrack(
       targetTrack.filepath,
       bitPerfectMode,
       selectedDevice === "Default" ? undefined : selectedDevice
     );
+
+    // Fetch cover art concurrently
+    fetchTrackCoverArt(targetTrack.filepath);
 
     set((state) => {
       let newQueue = state.queue;
@@ -160,17 +274,17 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
 
   stop: async () => {
     await api.stop();
-    set({ isPlaying: false, telemetry: { ...get().telemetry, current_time: 0 } });
+    set({ isPlaying: false });
   },
 
   togglePlayPause: async () => {
-    const { isPlaying, currentTrack, resume, pause, play, queue } = get();
+    const { isPlaying, pause, resume, play } = get();
     if (isPlaying) {
       await pause();
-    } else if (currentTrack) {
+    } else if (get().currentTrack) {
       await resume();
-    } else if (queue.length > 0) {
-      await play(queue[0]);
+    } else if (get().queue.length > 0) {
+      await play(get().queue[0]);
     }
   },
 
@@ -179,67 +293,47 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   },
 
   setVolume: async (vol: number) => {
-    const clamped = Math.max(0, Math.min(1.5, vol));
+    const clamped = Math.max(0, Math.min(1, vol));
     await api.setVolume(clamped);
     set({ volume: clamped });
   },
 
   nextTrack: async () => {
-    const { queue, queueIndex, shuffle, repeat, play } = get();
+    const { queue, queueIndex, shuffle, play } = get();
     if (queue.length === 0) return;
 
     let nextIdx = queueIndex + 1;
-
     if (shuffle) {
       nextIdx = Math.floor(Math.random() * queue.length);
     } else if (nextIdx >= queue.length) {
-      if (repeat === "all") {
-        nextIdx = 0;
-      } else {
-        return;
-      }
+      nextIdx = 0;
     }
 
-    const nextTrack = queue[nextIdx];
-    if (nextTrack) {
-      set({ queueIndex: nextIdx, currentTrack: nextTrack });
-      await play(nextTrack);
-    }
+    await play(queue[nextIdx]);
   },
 
   previousTrack: async () => {
-    const { queue, queueIndex, telemetry, seek, play } = get();
+    const { queue, queueIndex, play } = get();
     if (queue.length === 0) return;
 
-    if (telemetry.current_time > 3) {
-      await seek(0);
-      return;
+    let prevIdx = queueIndex - 1;
+    if (prevIdx < 0) {
+      prevIdx = queue.length - 1;
     }
 
-    const prevIdx = Math.max(0, queueIndex - 1);
-    const prevTrack = queue[prevIdx];
-    if (prevTrack) {
-      set({ queueIndex: prevIdx, currentTrack: prevTrack });
-      await play(prevTrack);
-    }
+    await play(queue[prevIdx]);
   },
 
-  setQueue: async (tracks: Track[], startIndex: number = 0) => {
-    set({
-      queue: tracks,
-      queueIndex: startIndex,
-      currentTrack: tracks[startIndex] || null,
-    });
+  setQueue: async (tracks: Track[], startIndex = 0) => {
+    set({ queue: tracks, queueIndex: startIndex });
     if (tracks[startIndex]) {
       await get().play(tracks[startIndex]);
     }
   },
 
-  addToQueue: (items: Track | Track[]) => {
-    const toAdd = Array.isArray(items) ? items : [items];
-    set((state) => ({
-      queue: [...state.queue, ...toAdd],
-    }));
+  addToQueue: (track: Track | Track[]) => {
+    const toAdd = Array.isArray(track) ? track : [track];
+    set((state) => ({ queue: [...state.queue, ...toAdd] }));
   },
 
   removeFromQueue: (index: number) => {
@@ -248,23 +342,16 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
       newQueue.splice(index, 1);
       let newIdx = state.queueIndex;
       if (index < state.queueIndex) {
-        newIdx = Math.max(0, state.queueIndex - 1);
+        newIdx--;
+      } else if (index === state.queueIndex) {
+        newIdx = Math.min(newIdx, newQueue.length - 1);
       }
-      return {
-        queue: newQueue,
-        queueIndex: newIdx,
-      };
+      return { queue: newQueue, queueIndex: newIdx };
     });
   },
 
   clearQueue: () => {
-    set({
-      queue: [],
-      queueIndex: -1,
-      currentTrack: null,
-      isPlaying: false,
-    });
-    api.stop();
+    set({ queue: [], queueIndex: -1 });
   },
 
   toggleShuffle: () => {
@@ -274,15 +361,14 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   cycleRepeat: () => {
     set((state) => {
       const modes: RepeatMode[] = ["off", "all", "one"];
-      const currentIdx = modes.indexOf(state.repeat);
-      const nextMode = modes[(currentIdx + 1) % modes.length];
-      return { repeat: nextMode };
+      const nextIdx = (modes.indexOf(state.repeat) + 1) % modes.length;
+      return { repeat: modes[nextIdx] };
     });
   },
 
   setBitPerfectMode: async (enabled: boolean) => {
-    set({ bitPerfectMode: enabled });
     const { selectedDevice } = get();
+    set({ bitPerfectMode: enabled });
     await api.setOutputDevice(
       selectedDevice === "Default" ? undefined : selectedDevice,
       enabled
@@ -290,8 +376,8 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   },
 
   setOutputDevice: async (deviceName: string) => {
-    set({ selectedDevice: deviceName });
     const { bitPerfectMode } = get();
+    set({ selectedDevice: deviceName });
     await api.setOutputDevice(
       deviceName === "Default" ? undefined : deviceName,
       bitPerfectMode
@@ -302,8 +388,8 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     try {
       const devices = await api.listAudioDevices();
       set({ availableDevices: ["Default", ...devices] });
-    } catch (e) {
-      console.error("Error al listar dispositivos de audio:", e);
+    } catch {
+      // Fallback
     }
   },
 
@@ -311,27 +397,18 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     try {
       const tracks = await api.getTracksFromDb(query);
       set({ libraryTracks: tracks, librarySearchQuery: query || "" });
-    } catch (e) {
-      console.error("Error al obtener pistas de la base de datos:", e);
+    } catch {
+      // Ignore
     }
   },
 
-  startDirectoryScan: async (path: string, force: boolean = false) => {
-    set({
-      scanStatus: {
-        is_scanning: true,
-        current: 0,
-        total: 0,
-        current_path: path,
-      },
-    });
+  startDirectoryScan: async (path: string, force = false) => {
     try {
+      set({ scanStatus: { is_scanning: true, current: 0, total: 0, current_path: path } });
       await api.triggerScan(path, force);
-    } catch (e) {
-      console.error("Error al disparar escaneo:", e);
-      set((state) => ({
-        scanStatus: { ...state.scanStatus, is_scanning: false },
-      }));
+    } catch (err: unknown) {
+      set({ scanStatus: { is_scanning: false, current: 0, total: 0 } });
+      console.error("Failed to start directory scan:", err);
     }
   },
 
@@ -343,26 +420,27 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     try {
       const entries = await api.readDirectoryLazy(path);
       set((state) => {
-        const nextHistory = state.explorer.history.slice(0, state.explorer.historyIndex + 1);
-        nextHistory.push(path);
-
+        const history = state.explorer.history.slice(0, state.explorer.historyIndex + 1);
+        if (history[history.length - 1] !== path) {
+          history.push(path);
+        }
         return {
           explorer: {
             currentPath: path,
             entries,
             isLoading: false,
             error: null,
-            history: nextHistory,
-            historyIndex: nextHistory.length - 1,
+            history,
+            historyIndex: history.length - 1,
           },
         };
       });
-    } catch (err) {
+    } catch (err: unknown) {
       set((state) => ({
         explorer: {
           ...state.explorer,
           isLoading: false,
-          error: String(err),
+          error: err instanceof Error ? err.message : String(err),
         },
       }));
     }
@@ -371,28 +449,24 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
   navigateBack: async () => {
     const { explorer, browseDirectory } = get();
     if (explorer.historyIndex > 0) {
-      const targetPath = explorer.history[explorer.historyIndex - 1];
-      set((state) => ({
-        explorer: {
-          ...state.explorer,
-          historyIndex: state.explorer.historyIndex - 1,
-        },
-      }));
+      const targetIdx = explorer.historyIndex - 1;
+      const targetPath = explorer.history[targetIdx];
       await browseDirectory(targetPath);
+      set((state) => ({
+        explorer: { ...state.explorer, historyIndex: targetIdx },
+      }));
     }
   },
 
   navigateForward: async () => {
     const { explorer, browseDirectory } = get();
     if (explorer.historyIndex < explorer.history.length - 1) {
-      const targetPath = explorer.history[explorer.historyIndex + 1];
-      set((state) => ({
-        explorer: {
-          ...state.explorer,
-          historyIndex: state.explorer.historyIndex + 1,
-        },
-      }));
+      const targetIdx = explorer.historyIndex + 1;
+      const targetPath = explorer.history[targetIdx];
       await browseDirectory(targetPath);
+      set((state) => ({
+        explorer: { ...state.explorer, historyIndex: targetIdx },
+      }));
     }
   },
 
@@ -406,23 +480,97 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     }
   },
 
+  setLanguage: (lang: Language) => {
+    set({ language: lang });
+    saveStoredSettings({
+      language: lang,
+      appearance: get().appearance,
+      librarySettings: get().librarySettings,
+    });
+  },
+
+  setAppearance: (patch: Partial<AppearanceState>) => {
+    set((state) => {
+      const next = { ...state.appearance, ...patch };
+      saveStoredSettings({
+        language: state.language,
+        appearance: next,
+        librarySettings: state.librarySettings,
+      });
+      return { appearance: next };
+    });
+  },
+
+  setLibrarySettings: (patch: Partial<LibrarySettings>) => {
+    set((state) => {
+      const next = { ...state.librarySettings, ...patch };
+      saveStoredSettings({
+        language: state.language,
+        appearance: state.appearance,
+        librarySettings: next,
+      });
+      return { librarySettings: next };
+    });
+  },
+
+  setSettingsOpen: (open: boolean) => {
+    set({ isSettingsOpen: open });
+  },
+
+  fetchTrackCoverArt: async (filepath: string) => {
+    const cache = get().coverArtCache;
+    if (cache[filepath]) {
+      set({ currentCoverArt: cache[filepath] });
+      return cache[filepath];
+    }
+    try {
+      const cover = await api.getTrackCoverArt(filepath);
+      if (cover) {
+        set((state) => ({
+          currentCoverArt: cover,
+          coverArtCache: { ...state.coverArtCache, [filepath]: cover },
+        }));
+        return cover;
+      }
+    } catch {
+      // Ignore
+    }
+    set({ currentCoverArt: null });
+    return null;
+  },
+
+  saveWindowSize: async () => {
+    // Persist layout & appearance settings into local storage
+    saveStoredSettings({
+      language: get().language,
+      appearance: get().appearance,
+      librarySettings: get().librarySettings,
+    });
+  },
+
   updateTelemetry: (telemetry: AudioTelemetry) => {
-    set((state) => ({
-      telemetry,
-      isPlaying: telemetry.state === "Playing",
-      volume: telemetry.volume,
-      bitPerfectMode: telemetry.is_bit_perfect,
-      selectedDevice: telemetry.output_device,
-      currentTrack:
-        state.currentTrack && state.currentTrack.filepath === telemetry.filepath
-          ? {
-              ...state.currentTrack,
-              sample_rate: telemetry.sample_rate || state.currentTrack.sample_rate,
-              bit_depth: telemetry.bits_per_sample || state.currentTrack.bit_depth,
-              bitrate_kbps: telemetry.bitrate || state.currentTrack.bitrate_kbps,
-            }
-          : state.currentTrack,
-    }));
+    set((state) => {
+      // Auto fetch cover art when track changes
+      if (telemetry.filepath && telemetry.filepath !== state.telemetry.filepath) {
+        get().fetchTrackCoverArt(telemetry.filepath);
+      }
+      return {
+        telemetry,
+        isPlaying: telemetry.state === "Playing",
+        volume: telemetry.volume,
+        bitPerfectMode: telemetry.is_bit_perfect,
+        selectedDevice: telemetry.output_device,
+        currentTrack:
+          state.currentTrack && state.currentTrack.filepath === telemetry.filepath
+            ? {
+                ...state.currentTrack,
+                sample_rate: telemetry.sample_rate || state.currentTrack.sample_rate,
+                bit_depth: telemetry.bits_per_sample || state.currentTrack.bit_depth,
+                bitrate_kbps: telemetry.bitrate || state.currentTrack.bitrate_kbps,
+              }
+            : state.currentTrack,
+      };
+    });
   },
 
   updateScanStatus: (status: ScanStatus) => {
@@ -465,3 +613,5 @@ export const useMusicStore = create<MusicPlayerStore>((set, get) => ({
     };
   },
 }));
+
+export const useAppStore = useMusicStore;
