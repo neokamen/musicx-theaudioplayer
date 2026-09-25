@@ -29,6 +29,7 @@ jwalk = "0.8"
 
 # Linux D-Bus MPRIS Media Controls
 mpris-player = "0.6"
+glib = "0.15"
 
 [profile.release]
 codegen-units = 1

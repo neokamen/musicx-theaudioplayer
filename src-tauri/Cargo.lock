@@ -2500,6 +2500,7 @@ name = "musicx"
 version = "0.1.0"
 dependencies = [
  "cpal",
+ "glib 0.15.12",
  "jwalk",
  "mpris-player",
  "rusqlite",

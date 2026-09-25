@@ -16,14 +16,14 @@ use tauri::Manager;
 pub fn run() {
     let audio_engine = Arc::new(AudioEngineHandle::new());
 
-    // Initialize MPRIS D-Bus background listener
-    mpris::start_mpris_service(Arc::clone(&audio_engine));
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup({
             let audio_engine = Arc::clone(&audio_engine);
             move |app| {
+                // Initialize MPRIS D-Bus player on GTK main thread
+                mpris::start_mpris_service(Arc::clone(&audio_engine));
+
                 // Initialize SQLite database in user's app data directory or fallback to current dir
                 let app_data_dir = app
                     .path()
