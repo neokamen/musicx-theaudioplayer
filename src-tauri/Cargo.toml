@@ -29,6 +29,8 @@ rusqlite = { version = "0.32", features = ["bundled", "bundled-full"] }
 jwalk = "0.8"
 
 # Linux D-Bus MPRIS Media Controls
+
+[target.'cfg(target_os = "linux")'.dependencies]
 mpris-player = "0.6"
 glib = "0.15"
 

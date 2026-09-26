@@ -3,6 +3,7 @@ pub mod commands;
 pub mod db;
 pub mod fs_lazy;
 pub mod models;
+#[cfg(target_os = "linux")]
 pub mod mpris;
 
 use audio::AudioEngineHandle;
@@ -16,7 +17,8 @@ use tauri::{Emitter, Manager};
 pub fn run() {
     let audio_engine = Arc::new(AudioEngineHandle::new());
 
-    // Initialize MPRIS D-Bus background listener
+    // Initialize the Linux MPRIS D-Bus background listener.
+    #[cfg(target_os = "linux")]
     mpris::start_mpris_service(Arc::clone(&audio_engine));
 
     tauri::Builder::default()
