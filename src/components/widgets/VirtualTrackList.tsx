@@ -14,6 +14,10 @@ import {
 } from "lucide-react";
 import type { Track } from "../../types/index.ts";
 
+import { ColumnResizeHandle } from "./ColumnResizeHandle.tsx";
+
+type TrackColumn = "track" | "title" | "artist" | "album" | "format" | "bitrate" | "duration";
+type TrackColumnWidths = Record<TrackColumn, number>;
 function formatDuration(sec: number): string {
   if (!sec || isNaN(sec)) return "0:00";
   const mins = Math.floor(sec / 60);
@@ -48,6 +52,9 @@ export const VirtualTrackList: React.FC = () => {
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("artist");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [columnWidths, setColumnWidths] = useState<TrackColumnWidths>({
+    track: 6, title: 33, artist: 18, album: 18, format: 10, bitrate: 8, duration: 7,
+  });
   const [visibleCols, setVisibleCols] = useState({
     artist: true,
     album: true,
@@ -63,6 +70,17 @@ export const VirtualTrackList: React.FC = () => {
   } | null>(null);
 
   const parentRef = useRef<HTMLDivElement>(null);
+  const tableWidthRef = useRef<HTMLDivElement>(null);
+
+  const resizeColumns = (left: TrackColumn, right: TrackColumn, deltaPixels: number) => {
+    const totalWidth = tableWidthRef.current?.clientWidth || 1;
+    const delta = (deltaPixels / totalWidth) * 100;
+    setColumnWidths((widths) => {
+      const adjusted = Math.max(5, Math.min(70, widths[left] + delta));
+      const appliedDelta = adjusted - widths[left];
+      return { ...widths, [left]: adjusted, [right]: Math.max(5, widths[right] - appliedDelta) };
+    });
+  };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
@@ -79,27 +97,23 @@ export const VirtualTrackList: React.FC = () => {
     }
   };
 
-  // Ordenar pistas en memoria
   const sortedTracks = useMemo(() => {
     return [...libraryTracks].sort((a, b) => {
       let valA = a[sortField];
       let valB = b[sortField];
-
       if (valA === null || valA === undefined) valA = "" as never;
       if (valB === null || valB === undefined) valB = "" as never;
-
       let comp = 0;
       if (typeof valA === "string" && typeof valB === "string") {
         comp = valA.localeCompare(valB, undefined, { sensitivity: "base" });
       } else {
         comp = (valA as number) > (valB as number) ? 1 : (valA as number) < (valB as number) ? -1 : 0;
       }
-
       return sortDirection === "asc" ? comp : -comp;
     });
   }, [libraryTracks, sortField, sortDirection]);
+  const visibleDurationSeconds = sortedTracks.reduce((sum, track) => sum + Math.max(0, track.duration_seconds || 0), 0);
 
-  // Virtualizador de filas de alto rendimiento
   const rowVirtualizer = useVirtualizer({
     count: sortedTracks.length,
     getScrollElement: () => parentRef.current,
@@ -113,16 +127,10 @@ export const VirtualTrackList: React.FC = () => {
 
   const handleContextMenu = (e: React.MouseEvent, track: Track) => {
     e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      track,
-    });
+    setContextMenu({ x: e.clientX, y: e.clientY, track });
   };
 
-  const closeContextMenu = () => {
-    setContextMenu(null);
-  };
+  const closeContextMenu = () => setContextMenu(null);
 
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) {
@@ -137,6 +145,7 @@ export const VirtualTrackList: React.FC = () => {
 
   return (
     <div
+      ref={tableWidthRef}
       className="flex flex-col h-full w-full bg-audiophile-surface select-none font-sans text-xs overflow-hidden"
       onClick={closeContextMenu}
     >
@@ -239,6 +248,7 @@ export const VirtualTrackList: React.FC = () => {
         <div
           onClick={() => handleSort("track_number")}
           className="w-10 text-center cursor-pointer flex items-center justify-center gap-1 group/col hover:text-white shrink-0"
+          style={{ flex: `0 0 ${columnWidths.track}%` }}
         >
           <span>#</span>
           {renderSortIndicator("track_number")}
@@ -246,49 +256,59 @@ export const VirtualTrackList: React.FC = () => {
 
         <div
           onClick={() => handleSort("title")}
-          className="flex-1 min-w-[150px] cursor-pointer flex items-center gap-1 group/col hover:text-white pr-2 truncate"
+          className="relative min-w-0 cursor-pointer flex items-center gap-1 group/col hover:text-white pr-2 truncate"
+          style={{ flex: `0 0 ${columnWidths.title}%` }}
         >
           <span>Título</span>
           {renderSortIndicator("title")}
+          {visibleCols.artist && <ColumnResizeHandle onResize={(delta) => resizeColumns("title", "artist", delta)} />}
         </div>
 
         {visibleCols.artist && (
           <div
             onClick={() => handleSort("artist")}
-            className="w-40 cursor-pointer flex items-center gap-1 group/col hover:text-white shrink-0 pr-2 truncate"
+            className="relative cursor-pointer flex items-center gap-1 group/col hover:text-white shrink-0 pr-2 truncate"
+            style={{ flex: `0 0 ${columnWidths.artist}%` }}
           >
             <span>Artista</span>
             {renderSortIndicator("artist")}
+            {visibleCols.album && <ColumnResizeHandle onResize={(delta) => resizeColumns("artist", "album", delta)} />}
           </div>
         )}
 
         {visibleCols.album && (
           <div
             onClick={() => handleSort("album")}
-            className="w-40 cursor-pointer flex items-center gap-1 group/col hover:text-white shrink-0 pr-2 truncate"
+            className="relative cursor-pointer flex items-center gap-1 group/col hover:text-white shrink-0 pr-2 truncate"
+            style={{ flex: `0 0 ${columnWidths.album}%` }}
           >
             <span>Álbum</span>
             {renderSortIndicator("album")}
+            {visibleCols.format && <ColumnResizeHandle onResize={(delta) => resizeColumns("album", "format", delta)} />}
           </div>
         )}
 
         {visibleCols.format && (
           <div
             onClick={() => handleSort("format")}
-            className="w-20 text-center cursor-pointer flex items-center justify-center gap-1 group/col hover:text-white shrink-0"
+            className="relative w-20 text-center cursor-pointer flex items-center justify-center gap-1 group/col hover:text-white shrink-0"
+            style={{ flex: `0 0 ${columnWidths.format}%` }}
           >
             <span>Formato</span>
             {renderSortIndicator("format")}
+            {visibleCols.bitrate && <ColumnResizeHandle onResize={(delta) => resizeColumns("format", "bitrate", delta)} />}
           </div>
         )}
 
         {visibleCols.bitrate && (
           <div
             onClick={() => handleSort("bitrate_kbps")}
-            className="w-20 text-right cursor-pointer flex items-center justify-end gap-1 group/col hover:text-white shrink-0 pr-2"
+            className="relative w-20 text-right cursor-pointer flex items-center justify-end gap-1 group/col hover:text-white shrink-0 pr-2"
+            style={{ flex: `0 0 ${columnWidths.bitrate}%` }}
           >
             <span>Bitrate</span>
             {renderSortIndicator("bitrate_kbps")}
+            {visibleCols.duration && <ColumnResizeHandle onResize={(delta) => resizeColumns("bitrate", "duration", delta)} />}
           </div>
         )}
 
@@ -296,6 +316,7 @@ export const VirtualTrackList: React.FC = () => {
           <div
             onClick={() => handleSort("duration_seconds")}
             className="w-16 text-right cursor-pointer flex items-center justify-end gap-1 group/col hover:text-white shrink-0"
+            style={{ flex: `0 0 ${columnWidths.duration}%` }}
           >
             <span>Duración</span>
             {renderSortIndicator("duration_seconds")}
@@ -355,7 +376,7 @@ export const VirtualTrackList: React.FC = () => {
                       : "text-audiophile-text"
                   }`}
                 >
-                  <div className="w-10 text-center text-audiophile-muted shrink-0">
+                  <div className="w-10 text-center text-audiophile-muted shrink-0" style={{ flex: `0 0 ${columnWidths.track}%` }}>
                     {isCurrent && isPlaying ? (
                       <Volume2 size={12} className="inline text-audiophile-cyan animate-pulse" />
                     ) : (
@@ -363,26 +384,26 @@ export const VirtualTrackList: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex-1 min-w-[150px] truncate pr-2">
+                  <div className="min-w-0 truncate pr-2" style={{ flex: `0 0 ${columnWidths.title}%` }}>
                     <span className="truncate group-hover:text-white hover-marquee" title={track.title}>
                       {track.title}
                     </span>
                   </div>
 
                   {visibleCols.artist && (
-                    <div className="w-40 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2 shrink-0">
+                    <div className="w-40 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2 shrink-0" style={{ flex: `0 0 ${columnWidths.artist}%` }}>
                       {track.artist}
                     </div>
                   )}
 
                   {visibleCols.album && (
-                    <div className="w-40 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2 shrink-0">
+                    <div className="w-40 text-audiophile-muted group-hover:text-audiophile-text truncate pr-2 shrink-0" style={{ flex: `0 0 ${columnWidths.album}%` }}>
                       {track.album}
                     </div>
                   )}
 
                   {visibleCols.format && (
-                    <div className="w-20 text-center shrink-0">
+                    <div className="w-20 text-center shrink-0" style={{ flex: `0 0 ${columnWidths.format}%` }}>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-audiophile-border/80 font-medium text-slate-300">
                         {track.format} {track.bit_depth > 0 ? `${track.bit_depth}b` : ""}
                       </span>
@@ -390,13 +411,13 @@ export const VirtualTrackList: React.FC = () => {
                   )}
 
                   {visibleCols.bitrate && (
-                    <div className="w-20 text-right text-audiophile-muted shrink-0 text-[10px] pr-2">
+                    <div className="w-20 text-right text-audiophile-muted shrink-0 text-[10px] pr-2" style={{ flex: `0 0 ${columnWidths.bitrate}%` }}>
                       {track.bitrate_kbps > 0 ? `${track.bitrate_kbps}k` : "---"}
                     </div>
                   )}
 
                   {visibleCols.duration && (
-                    <div className="w-16 text-right text-audiophile-muted shrink-0">
+                    <div className="w-16 text-right text-audiophile-muted shrink-0" style={{ flex: `0 0 ${columnWidths.duration}%` }}>
                       {formatDuration(track.duration_seconds)}
                     </div>
                   )}
@@ -439,7 +460,7 @@ export const VirtualTrackList: React.FC = () => {
 
       {/* Pie de estado de biblioteca */}
       <div className="h-6 px-3 border-t border-audiophile-border bg-audiophile-surface2 flex items-center justify-between text-[10px] font-mono text-audiophile-muted shrink-0">
-        <span>{sortedTracks.length} canciones indexadas</span>
+        <span>{sortedTracks.length} canciones · {Math.floor(visibleDurationSeconds / 60)} min visibles</span>
         <span className="text-audiophile-green">VIRTUAL RENDERER: 60+ FPS</span>
       </div>
     </div>

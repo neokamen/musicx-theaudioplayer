@@ -69,7 +69,7 @@ impl Default for AudioTelemetry {
             track_artist: None,
             track_album: None,
             filepath: None,
-            spectrum: vec![0.0; 16],
+            spectrum: vec![0.0; 64],
         }
     }
 }

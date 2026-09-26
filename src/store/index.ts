@@ -26,8 +26,16 @@ export interface AppearanceState {
   borderOpacity: number;
   borderRadius: number;
   borderGlow: boolean;
-  spectrumFps: 30 | 60 | 120;
+  spectrumFps: 30 | 60 | 120 | 144;
   spectrumStyle: SpectrumStyle;
+  cavaBars: number;
+  cavaSensitivity: number;
+  cavaGravity: "monstercat" | "studio" | "instant";
+  cavaOfflineFallback: boolean;
+  cavaSmoothing: number;
+  cavaPeakHold: boolean;
+  cavaMirrored: boolean;
+  cavaPalette: "accent" | "aurora" | "fire" | "mono";
 }
 
 export interface AudioSettingsState {
@@ -50,6 +58,10 @@ export interface PlaybackSettingsState {
   replayGainMode: "track" | "album" | "off";
   autoPlayOnDrop: boolean;
   playerBarStyle: "classic" | "spectrum" | "hybrid";
+  bpmValue: number;
+  bpmPulseEnabled: boolean;
+  playButtonBpmPulseEnabled: boolean;
+  playerBarWidth: number;
   diffuseAlbumArt: boolean;
   diffuseAlbumArtOpacity: number;
 }
@@ -163,6 +175,14 @@ const defaultAppearance: AppearanceState = {
   borderGlow: true,
   spectrumFps: 60,
   spectrumStyle: "bars",
+  cavaBars: 64,
+  cavaSensitivity: 100,
+  cavaGravity: "monstercat",
+  cavaOfflineFallback: true,
+  cavaSmoothing: 65,
+  cavaPeakHold: true,
+  cavaMirrored: true,
+  cavaPalette: "aurora",
 };
 
 const defaultAudioSettings: AudioSettingsState = {
@@ -185,14 +205,18 @@ const defaultPlaybackSettings: PlaybackSettingsState = {
   replayGainMode: "track",
   autoPlayOnDrop: true,
   playerBarStyle: "hybrid",
+  bpmValue: 128,
+  bpmPulseEnabled: true,
+  playButtonBpmPulseEnabled: true,
+  playerBarWidth: 100,
   diffuseAlbumArt: true,
   diffuseAlbumArtOpacity: 25,
 };
 
 const defaultListeningStats: ListeningStatsState = {
-  totalTracksPlayed: 142,
-  totalSecondsListened: 28540,
-  totalSessions: 18,
+  totalTracksPlayed: 0,
+  totalSecondsListened: 0,
+  totalSessions: 0,
 };
 
 const defaultLibrarySettings: LibrarySettings = {
@@ -213,12 +237,19 @@ function loadStoredSettings(): {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const savedStats = parsed.listeningStats || {};
+      const listeningStats =
+        savedStats.totalTracksPlayed === 142 &&
+        savedStats.totalSecondsListened === 28540 &&
+        savedStats.totalSessions === 18
+          ? defaultListeningStats
+          : { ...defaultListeningStats, ...savedStats };
       return {
         language: parsed.language || "es",
         appearance: { ...defaultAppearance, ...(parsed.appearance || {}) },
         audioSettings: { ...defaultAudioSettings, ...(parsed.audioSettings || {}) },
         playbackSettings: { ...defaultPlaybackSettings, ...(parsed.playbackSettings || {}) },
-        listeningStats: { ...defaultListeningStats, ...(parsed.listeningStats || {}) },
+        listeningStats,
         librarySettings: { ...defaultLibrarySettings, ...(parsed.librarySettings || {}) },
       };
     }

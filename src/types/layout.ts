@@ -5,6 +5,7 @@ export type WidgetType =
   | "inspector"
   | "eq_bars"
   | "spectrum"
+  | "cava_visualizer"
   | "dac_telemetry"
   | "queue";
 
@@ -44,6 +45,11 @@ export const AVAILABLE_WIDGETS: WidgetMeta[] = [
     type: "spectrum",
     label: "Espectro Visualizador (Tiempo Real)",
     description: "Visualización independiente de frecuencias FFT y vúmetros",
+  },
+  {
+    type: "cava_visualizer",
+    label: "Visualizador CAVA FFT",
+    description: "Visualizador FFT configurable con barras, sensibilidad y gravedad",
   },
   {
     type: "dac_telemetry",

@@ -357,6 +357,8 @@ function startRgbAnimation() {
     const root = document.documentElement;
     root.style.setProperty('--color-olive', activeColor);
     root.style.setProperty('--color-olive-hover', activeHover);
+    root.style.setProperty('--app-accent', activeColor);
+    root.style.setProperty('--app-accent-hover', activeHover);
     (window as any).__soundix_rgb_anim_id = requestAnimationFrame(step);
   };
   (window as any).__soundix_rgb_anim_id = requestAnimationFrame(step);
@@ -416,10 +418,16 @@ function startBgGradientAnimation(bgOpacityVal?: number) {
       root.style.setProperty('--color-charcoal', `rgba(${rCharcoal}, ${gCharcoal}, ${bCharcoal}, ${op.toFixed(2)})`);
       root.style.setProperty('--color-surface', `rgba(${rSurface}, ${gSurface}, ${bSurface}, ${Math.min(1, op + 0.04).toFixed(2)})`);
       root.style.setProperty('--color-surface-panel', `rgba(${rPanel}, ${gPanel}, ${bPanel}, ${Math.min(1, op + 0.08).toFixed(2)})`);
+      root.style.setProperty('--app-bg', `rgba(${rCharcoal}, ${gCharcoal}, ${bCharcoal}, ${op.toFixed(2)})`);
+      root.style.setProperty('--app-surface', `rgba(${rSurface}, ${gSurface}, ${bSurface}, ${Math.min(1, op + 0.04).toFixed(2)})`);
+      root.style.setProperty('--app-surface2', `rgba(${rPanel}, ${gPanel}, ${bPanel}, ${Math.min(1, op + 0.08).toFixed(2)})`);
     } else {
       root.style.setProperty('--color-charcoal', `rgb(${rCharcoal}, ${gCharcoal}, ${bCharcoal})`);
       root.style.setProperty('--color-surface', `rgb(${rSurface}, ${gSurface}, ${bSurface})`);
       root.style.setProperty('--color-surface-panel', `rgb(${rPanel}, ${gPanel}, ${bPanel})`);
+      root.style.setProperty('--app-bg', `rgb(${rCharcoal}, ${gCharcoal}, ${bCharcoal})`);
+      root.style.setProperty('--app-surface', `rgb(${rSurface}, ${gSurface}, ${bSurface})`);
+      root.style.setProperty('--app-surface2', `rgb(${rPanel}, ${gPanel}, ${bPanel})`);
     }
 
     const currentTinted = getSavedTintedBorders();
@@ -431,6 +439,7 @@ function startBgGradientAnimation(bgOpacityVal?: number) {
     } else {
       root.style.setProperty('--color-border', `rgb(${rBorder}, ${gBorder}, ${bBorder})`);
     }
+    root.style.setProperty('--app-border', root.style.getPropertyValue('--color-border'));
 
     (window as any).__soundix_bg_anim_id = requestAnimationFrame(step);
   };
@@ -575,7 +584,17 @@ export function applyTheme(
   root.style.setProperty('--color-cream', cream);
   root.style.setProperty('--bg-opacity', currentOpacity.toString());
 
-  // 5. Neon Glow & Scaled Intensity (100% on slider corresponds to 40% of previous max)
+  // Also synchronize --app-* CSS variables for MusicX components
+  root.style.setProperty('--app-accent', activeColor);
+  root.style.setProperty('--app-accent-hover', activeHover);
+  root.style.setProperty('--app-bg', finalCharcoal);
+  root.style.setProperty('--app-surface', finalSurface);
+  root.style.setProperty('--app-surface2', finalSurfacePanel);
+  root.style.setProperty('--app-border', finalBorder);
+  root.style.setProperty('--app-text', cream);
+  root.style.setProperty('--app-muted', isLight ? '#5b6470' : '#9ca3af');
+
+  // 5. Neon Glow & Scaled Intensity
   const currentGlow = neonGlow !== undefined ? neonGlow : getSavedNeonGlow();
   const currentIntensity = neonIntensity !== undefined ? neonIntensity : getSavedNeonGlowIntensity();
   setSavedNeonGlow(currentGlow);
@@ -598,6 +617,9 @@ export function applyTheme(
   const currentRadius = cornerRadius !== undefined ? cornerRadius : getSavedCornerRadius();
   setSavedCornerRadius(currentRadius);
   root.setAttribute('data-radius', currentRadius);
+  const radiusPx = currentRadius === 'square' ? 0 : currentRadius === 'industrial' ? 4 : currentRadius === 'modern' ? 8 : 14;
+  root.style.setProperty('--app-radius', `${radiusPx}px`);
+  root.style.setProperty('--app-corner-radius', `${radiusPx}px`);
 
   // 7. Ambient Studio Glow
   const currentAmbient =
@@ -623,6 +645,7 @@ export function applyTheme(
   }
 
   root.setAttribute('data-theme', bg);
+  root.style.colorScheme = isLight ? 'light' : 'dark';
   if (isLight) {
     root.classList.add('light-mode');
   } else {
@@ -650,6 +673,23 @@ export function applyTheme(
       }),
     );
   }
+}
+
+export function initTheme() {
+  applyTheme(
+    getSavedAccent(),
+    getSavedTheme(),
+    undefined,
+    undefined,
+    getSavedBgOpacity(),
+    getSavedNeonGlow(),
+    getSavedNeonGlowIntensity(),
+    getSavedTintedBorders(),
+    getSavedTintedBordersRatio(),
+    getSavedCornerRadius(),
+    getSavedAmbientGlow(),
+    getSavedMinimalScrollbars()
+  );
 }
 
 if (import.meta && (import.meta as any).hot) {

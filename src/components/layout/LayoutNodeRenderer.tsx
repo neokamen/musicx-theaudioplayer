@@ -112,16 +112,18 @@ export const LayoutNodeRenderer: React.FC<LayoutNodeRendererProps> = ({
 
             {index < node.children.length - 1 && (
               <Separator
-                className={`transition-colors flex items-center justify-center shrink-0 ${
+                disabled={!isEditing}
+                className={`relative transition-colors flex items-center justify-center shrink-0 ${
                   node.direction === "horizontal"
-                    ? "w-1.5 hover:w-2 hover:bg-audiophile-cyan/40 bg-audiophile-border cursor-col-resize"
-                    : "h-1.5 hover:h-2 hover:bg-audiophile-cyan/40 bg-audiophile-border cursor-row-resize"
-                } ${isEditing ? "bg-audiophile-cyan/30" : ""}`}
+                    ? isEditing ? "w-0.5" : "w-px"
+                    : isEditing ? "h-0.5" : "h-px"
+                } ${isEditing ? `bg-audiophile-cyan/55 ${node.direction === "horizontal" ? "cursor-col-resize" : "cursor-row-resize"}` : "bg-audiophile-border cursor-default"}`}
+                title={isEditing ? "Arrastrar para cambiar el tamaño del panel" : undefined}
               >
-                {node.direction === "horizontal" ? (
-                  <GripVertical size={10} className="text-audiophile-muted/40" />
-                ) : (
-                  <GripHorizontal size={10} className="text-audiophile-muted/40" />
+                {isEditing && (
+                  <span className="pointer-events-none absolute flex h-4 w-2 items-center justify-center rounded-sm bg-audiophile-surface2/90 text-audiophile-muted/70 shadow-sm">
+                    {node.direction === "horizontal" ? <GripVertical size={8} /> : <GripHorizontal size={8} />}
+                  </span>
                 )}
               </Separator>
             )}

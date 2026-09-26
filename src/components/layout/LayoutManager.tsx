@@ -2,16 +2,20 @@ import React, { useState, useEffect } from "react";
 import type { LayoutNode, WidgetType } from "../../types/layout.ts";
 import {
   DEFAULT_LAYOUT,
+  LAYOUT_PRESETS,
   loadLayoutFromStorage,
   saveLayoutToStorage,
   resetLayoutStorage,
 } from "./defaultLayout.ts";
 import { LayoutNodeRenderer } from "./LayoutNodeRenderer.tsx";
-import { Sliders, RotateCcw, Check } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
-export const LayoutManager: React.FC = () => {
+interface LayoutManagerProps {
+  isEditing: boolean;
+}
+
+export const LayoutManager: React.FC<LayoutManagerProps> = ({ isEditing }) => {
   const [layout, setLayout] = useState<LayoutNode>(loadLayoutFromStorage);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
 
   useEffect(() => {
     saveLayoutToStorage(layout);
@@ -133,55 +137,33 @@ export const LayoutManager: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden select-none bg-audiophile-base">
-      {/* Barra de control para Modo Edición */}
-      <div className="h-8 px-4 border-b border-audiophile-border bg-audiophile-surface flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-audiophile-muted uppercase tracking-wider">
-            Arquitectura:
-          </span>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-audiophile-surface2 border border-audiophile-border text-audiophile-cyan">
-            Ventanas Modular
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {isEditing && (
-            <button
-              onClick={handleResetLayout}
-              className="px-2.5 py-1 rounded bg-audiophile-surface2 hover:bg-audiophile-border text-[11px] font-mono text-audiophile-muted hover:text-white transition-colors flex items-center gap-1.5"
-              title="Restaurar layout predeterminado de 3 columnas"
-            >
-              <RotateCcw size={12} />
-              <span>Restablecer</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className={`px-3 py-1 rounded text-[11px] font-mono transition-all flex items-center gap-1.5 active:scale-95 ${
-              isEditing
-                ? "bg-audiophile-cyan text-audiophile-base font-bold shadow-lg shadow-audiophile-cyan/20"
-                : "bg-audiophile-surface2 hover:bg-audiophile-border text-audiophile-text border border-audiophile-border"
-            }`}
+    <div className="relative flex h-full w-full flex-col overflow-hidden select-none bg-audiophile-base">
+      {isEditing && (
+        <div className="absolute right-3 top-3 z-40 flex items-center gap-2">
+          <select
+            defaultValue=""
+            onChange={(event) => {
+              const preset = LAYOUT_PRESETS.find((item) => item.id === event.target.value);
+              if (preset) setLayout(JSON.parse(JSON.stringify(preset.layout)) as LayoutNode);
+              event.currentTarget.value = "";
+            }}
+            className="rounded border border-audiophile-border bg-audiophile-surface2/95 px-2 py-1 text-[11px] font-mono text-audiophile-text"
+            aria-label="Aplicar preset de interfaz"
           >
-            {isEditing ? (
-              <>
-                <Check size={12} />
-                <span>Guardar Layout</span>
-              </>
-            ) : (
-              <>
-                <Sliders size={12} />
-                <span>Editar Interfaz</span>
-              </>
-            )}
+            <option value="" disabled>Layouts</option>
+            {LAYOUT_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+          </select>
+          <button
+            onClick={handleResetLayout}
+            className="flex items-center gap-1.5 rounded border border-audiophile-border bg-audiophile-surface2/90 px-2 py-1 text-[11px] font-mono text-audiophile-muted hover:text-white"
+            title="Restaurar layout predeterminado"
+          >
+            <RotateCcw size={12} />
+            <span>Restablecer</span>
           </button>
         </div>
-      </div>
-
-      {/* Árbol de Paneles Redimensionables */}
-      <div className="flex-1 w-full h-[calc(100%-2rem)] overflow-hidden">
+      )}
+      <div className="h-full w-full overflow-hidden">
         <LayoutNodeRenderer
           node={layout}
           isEditing={isEditing}

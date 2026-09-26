@@ -35,7 +35,7 @@ export const DEFAULT_LAYOUT: LayoutNode = {
         {
           id: "panel-right-spectrum",
           type: "leaf",
-          widget: "spectrum",
+          widget: "cava_visualizer",
         },
         {
           id: "panel-right-dac",
@@ -47,18 +47,90 @@ export const DEFAULT_LAYOUT: LayoutNode = {
   ],
 };
 
-const STORAGE_KEY = "musicx_layout_config_v15";
+export const LAYOUT_PRESETS: { id: string; label: string; layout: LayoutNode }[] = [
+  { id: "default", label: "Tres columnas", layout: DEFAULT_LAYOUT },
+  {
+    id: "wide-library",
+    label: "Biblioteca amplia",
+    layout: {
+      id: "preset-wide",
+      type: "split",
+      direction: "horizontal",
+      sizes: [24, 76],
+      children: [
+        { id: "preset-wide-explorer", type: "leaf", widget: "folder_explorer" },
+        { id: "preset-wide-tracks", type: "leaf", widget: "tracklist" },
+      ],
+    },
+  },
+  {
+    id: "cava-studio",
+    label: "Estudio CAVA",
+    layout: {
+      id: "preset-cava",
+      type: "split",
+      direction: "horizontal",
+      sizes: [68, 32],
+      children: [
+        { id: "preset-cava-tracks", type: "leaf", widget: "tracklist" },
+        {
+          id: "preset-cava-side",
+          type: "split",
+          direction: "vertical",
+          sizes: [58, 42],
+          children: [
+            { id: "preset-cava-visual", type: "leaf", widget: "cava_visualizer" },
+            { id: "preset-cava-queue", type: "leaf", widget: "queue" },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: "explorer-visual",
+    label: "Explorador + visualización",
+    layout: {
+      id: "preset-explorer",
+      type: "split",
+      direction: "horizontal",
+      sizes: [38, 62],
+      children: [
+        { id: "preset-explorer-files", type: "leaf", widget: "folder_explorer" },
+        {
+          id: "preset-explorer-right",
+          type: "split",
+          direction: "vertical",
+          sizes: [68, 32],
+          children: [
+            { id: "preset-explorer-tracks", type: "leaf", widget: "tracklist" },
+            { id: "preset-explorer-cava", type: "leaf", widget: "cava_visualizer" },
+          ],
+        },
+      ],
+    },
+  },
+];
+
+const STORAGE_KEY = "musicx_layout_config_v16";
 
 export function loadLayoutFromStorage(): LayoutNode {
   try {
-    for (let i = 1; i <= 14; i++) {
+    for (let i = 1; i <= 15; i++) {
       localStorage.removeItem(`musicx_layout_config_v${i}`);
     }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as LayoutNode;
       if (parsed && parsed.id && parsed.type) {
-        return parsed;
+        const migrateCavaPanel = (node: LayoutNode): LayoutNode => {
+          if (node.type === "leaf") {
+            return node.id === "panel-right-spectrum" && node.widget === "spectrum"
+              ? { ...node, widget: "cava_visualizer" }
+              : node;
+          }
+          return { ...node, children: node.children.map(migrateCavaPanel) };
+        };
+        return migrateCavaPanel(parsed);
       }
     }
   } catch (e) {
@@ -77,7 +149,7 @@ export function saveLayoutToStorage(layout: LayoutNode): void {
 
 export function resetLayoutStorage(): LayoutNode {
   try {
-    for (let i = 1; i <= 15; i++) {
+    for (let i = 1; i <= 16; i++) {
       localStorage.removeItem(`musicx_layout_config_v${i}`);
     }
   } catch {

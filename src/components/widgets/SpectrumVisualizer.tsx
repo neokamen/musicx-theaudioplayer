@@ -42,6 +42,7 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
   const isPlaying = (isPlayingStore || telemetry.state === 'Playing') && telemetry.state !== 'Stopped' && telemetry.state !== 'Paused';
   const volume = telemetry.volume ?? storeVolume ?? 1;
+  const numBands = Math.max(16, Math.min(128, appearance.cavaBars || 64));
 
   // Double-click to cycle spectrum visualizer styles
   const handleDoubleClick = () => {
@@ -61,13 +62,14 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
     let animId: number;
     let lastTime = performance.now();
 
-    const numBands = 24;
     const currentBands = new Float32Array(numBands);
     const peaks = new Float32Array(numBands);
     const peakVelocity = new Float32Array(numBands);
+    const frameInterval = 1000 / Math.max(30, appearance.spectrumFps || 60);
 
     const render = (now: number) => {
       animId = requestAnimationFrame(render);
+      if (now - lastTime < frameInterval) return;
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
@@ -83,7 +85,11 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
 
       if (w === 0 || h === 0) return;
 
-      const accent = appearance.accentColor || '#06b6d4';
+      const accent = appearance.cavaPalette === 'fire'
+        ? '#ff5a36'
+        : appearance.cavaPalette === 'mono'
+        ? '#cbd5e1'
+        : appearance.accentColor || '#06b6d4';
       const timeSec = now / 1000;
 
       // Extract real audio spectrum values from Rust telemetry
@@ -97,23 +103,28 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
           currentBands[i] = Math.max(0, currentBands[i] - dt * 2.5);
         } else if (targetBands.length > 0) {
           const specIdx = Math.floor((i / numBands) * targetBands.length);
-          const rawVal = Math.max(0, Math.min(1.0, (targetBands[specIdx] || 0) * (volume > 1 ? 1 : volume) * 1.35));
+          const rawVal = Math.max(0, Math.min(1.0, (targetBands[specIdx] || 0) * (volume > 1 ? 1 : volume) * 1.35 * (appearance.cavaSensitivity / 100)));
           // Exponential decay/attack interpolation (ultra smooth curve style)
-          const factor = 1 - Math.exp(-dt * 22);
+          const factor = 1 - Math.exp(-dt * (22 - appearance.cavaSmoothing * 0.16));
           currentBands[i] += (rawVal - currentBands[i]) * factor;
-        } else {
+        } else if (appearance.cavaOfflineFallback) {
           // Dynamic organic wave synthesis during active playback
-          const synth = (Math.sin(timeSec * 5 + i * 0.4) * 0.4 + 0.5) * Math.min(1, volume) * 0.85;
-          const factor = 1 - Math.exp(-dt * 18);
+          const synth = (Math.sin(timeSec * 5 + i * 0.4) * 0.4 + 0.5) * Math.min(1, volume) * 0.85 * (appearance.cavaSensitivity / 100);
+          const factor = 1 - Math.exp(-dt * (18 - appearance.cavaSmoothing * 0.12));
           currentBands[i] += (synth - currentBands[i]) * factor;
+        } else {
+          currentBands[i] = Math.max(0, currentBands[i] - dt * 2.5);
         }
 
         // Gravity physics for peaks
-        if (currentBands[i] > peaks[i]) {
+        if (!appearance.cavaPeakHold || appearance.cavaGravity === 'instant') {
+          peaks[i] = currentBands[i];
+          peakVelocity[i] = 0;
+        } else if (currentBands[i] > peaks[i]) {
           peaks[i] = currentBands[i];
           peakVelocity[i] = 0;
         } else {
-          peakVelocity[i] += dt * 1.2;
+          peakVelocity[i] += dt * (appearance.cavaGravity === 'studio' ? 0.65 : 1.2);
           peaks[i] = Math.max(0, peaks[i] - peakVelocity[i] * dt * 60);
         }
       }
@@ -168,6 +179,17 @@ export const SpectrumVisualizer: React.FC<SpectrumVisualizerProps> = ({
             ctx.lineTo(x, waveY);
           }
           ctx.stroke();
+          if (appearance.cavaMirrored) {
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            for (let x = 0; x < w; x += 4) {
+              const idx = Math.floor((x / w) * numBands);
+              const amp = currentBands[idx] * (h / 2.5);
+              const waveY = centerY - (isPlaying ? Math.sin(x * 0.06 + timeSec * 14) * amp : 0);
+              ctx.lineTo(x, waveY);
+            }
+            ctx.stroke();
+          }
           break;
         }
 

@@ -1,6 +1,7 @@
 use crate::models::{AudioTelemetry, PlaybackState};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Stream, StreamConfig};
+use rustfft::{num_complex::Complex, Fft, FftPlanner};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
@@ -178,10 +179,13 @@ struct AudioEngineInternal {
     samples_rendered: Arc<AtomicU32>,
     current_pos_secs: f64,
     dsp_settings: Arc<Mutex<DspSettings>>,
+    spectrum_fft: Arc<dyn Fft<f32>>,
 }
 
 impl AudioEngineInternal {
     fn new(receiver: Receiver<AudioCommand>, telemetry: Arc<Mutex<AudioTelemetry>>) -> Self {
+        let mut planner = FftPlanner::<f32>::new();
+        let spectrum_fft = planner.plan_fft_forward(1024);
         Self {
             receiver,
             telemetry,
@@ -198,6 +202,7 @@ impl AudioEngineInternal {
             samples_rendered: Arc::new(AtomicU32::new(0)),
             current_pos_secs: 0.0,
             dsp_settings: Arc::new(Mutex::new(DspSettings::default())),
+            spectrum_fft,
         }
     }
 
@@ -545,32 +550,15 @@ impl AudioEngineInternal {
             .clone()
             .unwrap_or_else(|| "System Default (PipeWire/ALSA)".to_string());
 
-        if is_playing {
+        let fft_frame = {
             let buffer_lock = self.pcm_buffer.lock().unwrap();
-            let len = buffer_lock.len();
-            if len >= 256 {
-                let sample_slice: Vec<f32> = buffer_lock.iter().take(256).copied().collect();
-                let mut spectrum_bands = vec![0.0f32; 16];
-                let band_size = 256 / 16;
-                for b in 0..16 {
-                    let start = b * band_size;
-                    let mut sum_sq = 0.0f32;
-                    for i in 0..band_size {
-                        let s = sample_slice[start + i];
-                        sum_sq += s * s;
-                    }
-                    let rms = (sum_sq / band_size as f32).sqrt();
-                    let vol = tele.volume;
-                    let scaled = (rms * 3.2 * vol).min(1.0);
-                    spectrum_bands[b] = scaled;
-                }
-                tele.spectrum = spectrum_bands;
-            } else {
-                tele.spectrum = vec![0.0; 16];
-            }
+            buffer_lock.iter().take(1024).copied().collect::<Vec<_>>()
+        };
+        tele.spectrum = if is_playing {
+            calculate_spectrum(&fft_frame, self.spectrum_fft.as_ref())
         } else {
-            tele.spectrum = vec![0.0; 16];
-        }
+            vec![0.0; 64]
+        };
 
         if let Some(ref src) = self.current_source {
             tele.sample_rate = src.sample_rate;
@@ -590,6 +578,41 @@ impl AudioEngineInternal {
     }
 }
 
+fn calculate_spectrum(samples: &[f32], fft: &dyn Fft<f32>) -> Vec<f32> {
+    const FFT_SIZE: usize = 1024;
+    const BAND_COUNT: usize = 64;
+
+    let mut frame = vec![Complex::new(0.0f32, 0.0f32); FFT_SIZE];
+    for (index, sample) in samples.iter().take(FFT_SIZE).enumerate() {
+        let window = 0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / (FFT_SIZE - 1) as f32).cos();
+        frame[index].re = sample * window;
+    }
+    fft.process(&mut frame);
+
+    let highest_bin = FFT_SIZE / 2;
+    let logarithmic_span = highest_bin as f32;
+    (0..BAND_COUNT)
+        .map(|band| {
+            let low = (logarithmic_span.powf(band as f32 / BAND_COUNT as f32).floor() as usize).max(1);
+            let high = (logarithmic_span.powf((band + 1) as f32 / BAND_COUNT as f32).ceil() as usize)
+                .max(low + 1)
+                .min(highest_bin);
+            let mut power = 0.0;
+            let mut bins = 0usize;
+            for bin in low..high {
+                let magnitude = frame[bin].norm() / (FFT_SIZE as f32 * 0.25);
+                power += magnitude * magnitude;
+                bins += 1;
+            }
+            if bins == 0 {
+                0.0
+            } else {
+                ((power / bins as f32).sqrt() * 5.5).clamp(0.0, 1.0)
+            }
+        })
+        .collect()
+}
+
 /// Helper para listar los dispositivos de salida disponibles
 pub fn get_available_audio_devices() -> Vec<String> {
     let host = cpal::default_host();
@@ -604,4 +627,33 @@ pub fn get_available_audio_devices() -> Vec<String> {
     }
 
     names
+}
+
+#[cfg(test)]
+mod spectrum_tests {
+    use super::calculate_spectrum;
+    use rustfft::FftPlanner;
+
+    #[test]
+    fn fft_places_a_tone_in_a_frequency_band() {
+        let sample_rate = 44_100.0;
+        let tone = (0..1024)
+            .map(|index| {
+                (std::f32::consts::TAU * 440.0 * index as f32 / sample_rate).sin() * 0.5
+            })
+            .collect::<Vec<_>>();
+        let mut planner = FftPlanner::<f32>::new();
+        let fft = planner.plan_fft_forward(1024);
+
+        let spectrum = calculate_spectrum(&tone, fft.as_ref());
+        let strongest_band = spectrum
+            .iter()
+            .enumerate()
+            .max_by(|left, right| left.1.total_cmp(right.1))
+            .map(|(index, _)| index)
+            .unwrap();
+
+        assert!(spectrum[strongest_band] > 0.1);
+        assert!((20..36).contains(&strongest_band));
+    }
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import type { WidgetType } from "../../types/layout.ts";
-import { FolderExplorer } from "./FolderExplorer.tsx";
+import { FolderExplorerWidget } from "./FolderExplorerWidget.tsx";
 import { VirtualTrackList } from "./VirtualTrackList.tsx";
 import { CoverWidget } from "./CoverWidget.tsx";
 import { InspectorWidget } from "./InspectorWidget.tsx";
@@ -8,6 +8,7 @@ import { EqBarsWidget } from "./EqBarsWidget.tsx";
 import { DacTelemetryWidget } from "./DacTelemetryWidget.tsx";
 import { StandaloneSpectrumWidget } from "./StandaloneSpectrumWidget.tsx";
 import { QueueWidget } from "./QueueWidget.tsx";
+import { CavaVisualizer } from "./CavaVisualizer.tsx";
 
 interface WidgetRendererProps {
   widget: WidgetType;
@@ -16,7 +17,7 @@ interface WidgetRendererProps {
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
   switch (widget) {
     case "folder_explorer":
-      return <FolderExplorer />;
+      return <FolderExplorerWidget />;
     case "tracklist":
       return <VirtualTrackList />;
     case "cover":
@@ -27,6 +28,8 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
       return <EqBarsWidget />;
     case "spectrum":
       return <StandaloneSpectrumWidget />;
+    case "cava_visualizer":
+      return <CavaVisualizer />;
     case "dac_telemetry":
       return <DacTelemetryWidget />;
     case "queue":

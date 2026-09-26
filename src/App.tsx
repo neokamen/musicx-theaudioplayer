@@ -1,51 +1,61 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Check, Settings, SlidersHorizontal } from "lucide-react";
 import { LayoutManager } from "./components/layout/LayoutManager.tsx";
 import { HiFiPlayerBar } from "./components/player/HiFiPlayerBar.tsx";
 import { SettingsModal } from "./components/settings/SettingsModal.tsx";
+import { AudioEQModal } from "./components/audio/AudioEQModal.tsx";
 import { useMusicStore } from "./store/index.ts";
+import { initTheme } from "./lib/theme.ts";
 
 export default function App() {
   const {
     initListeners,
-    telemetry,
     appearance,
     playbackSettings,
+    isPlaying,
+    listeningStats,
     setSettingsOpen,
     addToQueue,
     play,
   } = useMusicStore();
 
+  const [isAudioEqOpen, setIsAudioEqOpen] = useState(false);
+  const [isLayoutEditing, setIsLayoutEditing] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [playerBarHeightRatio, setPlayerBarHeightRatio] = useState(() => {
+    const savedRatio = Number(localStorage.getItem("musicx_playerbar_height_ratio"));
+    return Number.isFinite(savedRatio) && savedRatio >= 0.06 && savedRatio <= 0.42 ? savedRatio : 0.18;
+  });
+  const playerBarHeight = Math.max(88, Math.min(viewportHeight * 0.42, Math.round(viewportHeight * playerBarHeightRatio)));
+  const totalListenedSeconds = Math.max(0, Math.floor(listeningStats.totalSecondsListened));
+  const listenedYears = Math.floor(totalListenedSeconds / 31_536_000);
+  const listenedMonths = Math.floor((totalListenedSeconds % 31_536_000) / 2_592_000);
+  const listenedDays = Math.floor((totalListenedSeconds % 2_592_000) / 86_400);
+  const listenedClock = totalListenedSeconds % 86_400;
+  const listenedTime = [
+    Math.floor(listenedClock / 3600),
+    Math.floor((listenedClock % 3600) / 60),
+    listenedClock % 60,
+  ].map((part) => String(part).padStart(2, "0")).join(":");
+  const bpm = playbackSettings.bpmValue || 128;
+
   useEffect(() => {
+    initTheme();
     let cleanup: (() => void) | undefined;
     initListeners().then((unlisten: () => void) => {
       cleanup = unlisten;
     });
 
     return () => {
-      if (cleanup) cleanup();
+    cleanup?.();
     };
   }, [initListeners]);
 
-  // Sincronizar variables CSS dinámicas para apariencia en toda la aplicación
   useEffect(() => {
-    const root = document.documentElement;
-    const bg = appearance.bgColor || "#090d16";
-    const accent = appearance.accentColor || "#06b6d4";
-    const blur = appearance.glassmorphism ? (appearance.glassBlur ?? 10) : 0;
-    const radius = appearance.borderRadius ?? 8;
-    const borderAlpha = appearance.borderEffect ? (appearance.borderOpacity ?? 40) / 100 : 0.2;
-
-    root.style.setProperty("--app-bg", bg);
-    root.style.setProperty("--app-surface", appearance.glassmorphism ? `${bg}d0` : bg);
-    root.style.setProperty("--app-surface2", appearance.glassmorphism ? `${bg}e8` : "#131b2e");
-    root.style.setProperty("--app-accent", accent);
-    root.style.setProperty(
-      "--app-border",
-      `rgba(255, 255, 255, ${borderAlpha * 0.3})`
-    );
-    root.style.setProperty("--app-radius", `${radius}px`);
-    root.style.setProperty("--app-blur", `${blur}px`);
-  }, [appearance]);
+    const updateViewportHeight = () => setViewportHeight(window.innerHeight);
+    window.addEventListener("resize", updateViewportHeight);
+    return () => window.removeEventListener("resize", updateViewportHeight);
+  }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -60,8 +70,7 @@ export default function App() {
       const audioFiles = files.filter((f) =>
         /\.(mp3|flac|wav|ogg|m4a|aac|opus|alac)$/i.test(f.name)
       );
-      if (audioFiles.length > 0) {
-        const newTracks = audioFiles.map((f, idx) => ({
+      const newTracks = audioFiles.map((f, idx) => ({
           filepath: (f as { path?: string }).path || f.name,
           title: f.name.replace(/\.[^/.]+$/, ""),
           artist: "Archivo Arrastrado",
@@ -79,13 +88,12 @@ export default function App() {
         if (playbackSettings?.autoPlayOnDrop && newTracks.length > 0) {
           play(newTracks[0]);
         }
-      }
     }
   };
 
   const customStyles: React.CSSProperties = {
-    backgroundColor: appearance.bgColor || "#090d16",
-    color: "#f8fafc",
+    backgroundColor: "var(--app-bg)",
+    color: "var(--app-text)",
     backdropFilter: appearance.glassmorphism
       ? `blur(${appearance.glassBlur}px)`
       : "none",
@@ -98,58 +106,92 @@ export default function App() {
       className="flex flex-col h-screen w-screen text-slate-100 select-none font-sans overflow-hidden transition-colors duration-300"
       style={customStyles}
     >
-      {/* Barra de Título Superior Hi-Fi */}
-      <header className="h-10 border-b border-slate-800/80 bg-slate-950/80 flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-2.5 h-2.5 rounded-full shadow-sm"
-            style={{
-              backgroundColor: appearance.accentColor || "#06b6d4",
-              boxShadow: appearance.neonGlow
-                ? `0 0 10px ${appearance.accentColor}`
-                : "none",
-            }}
-          />
-          <span className="font-mono text-xs font-bold tracking-wider text-slate-200 uppercase">
-            musicx &bull; the audio player
-          </span>
+      <header className="h-11 border-b border-slate-800/80 bg-slate-950/90 flex items-center justify-between px-4 shrink-0 shadow-sm z-20">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex items-center gap-2">
+            <img
+              src="/musicx-banner.png"
+              alt="MusicX Banner"
+              className="h-7 w-auto object-contain max-w-[140px]"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/musicx-logo.png";
+              }}
+            />
+          </div>
+
           <span
-            className="text-[10px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-700 font-mono"
-            style={{ color: appearance.accentColor }}
+            className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 font-mono tracking-wider"
+            style={{ color: appearance.accentColor || "#06b6d4" }}
           >
             Hi-Fi Bit-Perfect Core
           </span>
+          <span className="hidden lg:inline-flex items-center gap-1.5 whitespace-nowrap font-mono text-[10px] text-slate-400" title="Tiempo total de reproducción acumulado">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${isPlaying ? "bg-emerald-400" : "bg-slate-500"}`}
+              style={isPlaying ? { animation: `bpm-beat-glow ${60 / bpm}s ease-in-out infinite` } : undefined}
+            />
+            <span style={{ color: appearance.accentColor || "#06b6d4" }}>In Play:</span>
+            <span>{listenedYears}y {listenedMonths}m {listenedDays}d {listenedTime}</span>
+          </span>
         </div>
 
-        <div className="flex items-center gap-3 font-mono text-[11px] text-slate-400">
-          <span
-            className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
-            style={{ color: appearance.accentColor }}
+        <div className="flex shrink-0 items-center gap-3 font-mono text-[11px] text-slate-400">
+          <span className="text-[10px] hidden sm:inline text-slate-500">ALSA / PIPEWIRE DIRECT</span>
+
+          <button
+            onClick={() => setIsAudioEqOpen(true)}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border font-sans font-semibold transition cursor-pointer"
+            style={{
+              borderColor: `${appearance.accentColor || "#06b6d4"}50`,
+              backgroundColor: `${appearance.accentColor || "#06b6d4"}15`,
+              color: appearance.accentColor || "#06b6d4",
+            }}
+            title="Abrir Audio EQ PRO completo tipo Soundix"
           >
-            {telemetry.sample_rate > 0
-              ? `${(telemetry.sample_rate / 1000).toFixed(1)} kHz / ${telemetry.bits_per_sample}b`
-              : "44.1 kHz / 16b"}
-          </span>
-          <span className="text-[10px]">LINUX / ALSA & PIPEWIRE</span>
+            <SlidersHorizontal size={13} />
+            <span>Audio EQ PRO</span>
+          </button>
+
+          <button
+            onClick={() => setIsLayoutEditing((editing) => !editing)}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition cursor-pointer font-sans"
+            style={{
+              borderColor: `${appearance.accentColor || "#06b6d4"}50`,
+              backgroundColor: isLayoutEditing ? `${appearance.accentColor || "#06b6d4"}25` : "transparent",
+              color: appearance.accentColor || "#06b6d4",
+            }}
+            title={isLayoutEditing ? "Guardar distribución" : "Editar interfaz"}
+          >
+            {isLayoutEditing ? <Check size={13} /> : <SlidersHorizontal size={13} />}
+            <span>{isLayoutEditing ? "Guardar Layout" : "Editar Interfaz"}</span>
+          </button>
 
           <button
             onClick={() => setSettingsOpen(true)}
-            className="text-xs px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer font-sans"
           >
-            ⚙ Ajustes
+            <Settings size={13} />
+            <span>Ajustes</span>
           </button>
         </div>
       </header>
 
-      {/* Área Principal: Layout Modular Redimensionable */}
       <main className="flex-1 w-full overflow-hidden">
-        <LayoutManager />
+        <LayoutManager isEditing={isLayoutEditing} />
       </main>
 
-      {/* Barra de Reproducción y Telemetría Hi-Fi */}
-      <HiFiPlayerBar />
+      <HiFiPlayerBar
+        height={playerBarHeight}
+        isEditing={isLayoutEditing}
+        onHeightChange={(height) => {
+          const nextRatio = Math.max(0.06, Math.min(0.42, height / window.innerHeight));
+          setPlayerBarHeightRatio(nextRatio);
+          localStorage.setItem("musicx_playerbar_height_ratio", String(nextRatio));
+        }}
+      />
 
-      {/* Modal de Ajustes Globales */}
+      <AudioEQModal isOpen={isAudioEqOpen} onClose={() => setIsAudioEqOpen(false)} />
+
       <SettingsModal />
     </div>
   );
